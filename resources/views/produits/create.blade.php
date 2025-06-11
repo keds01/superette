@@ -1,0 +1,512 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="py-12">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <!-- Header moderne -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10 animate-fade-in-down">
+            <div>
+                <h1 class="text-4xl font-extrabold bg-gradient-to-tr from-indigo-600 via-blue-500 to-purple-600 bg-clip-text text-transparent tracking-tight drop-shadow-lg">Nouveau Produit</h1>
+                <p class="mt-2 text-lg text-gray-500">Créez un nouveau produit en renseignant les informations ci-dessous.</p>
+            </div>
+            <a href="{{ route('produits.index') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-arrow-left"></i>
+                Retour à la liste
+            </a>
+        </div>
+
+        <!-- Formulaire principal -->
+        <div class="relative bg-white/60 backdrop-blur-xl border border-indigo-100 rounded-2xl shadow-2xl p-8 mb-8">
+            @if(session('error'))
+                <div class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if(session('success'))
+                <div class="mb-6 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span>{{ session('success') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-exclamation-circle mt-0.5"></i>
+                        <div>
+                            <p class="font-semibold mb-2">Veuillez corriger les erreurs ci-dessous&nbsp;:</p>
+                            <ul class="list-disc list-inside space-y-1 text-sm">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            @endif
+            <form action="{{ route('produits.store') }}" method="POST" enctype="multipart/form-data" id="productForm" class="space-y-8">
+                @csrf
+
+                <!-- Section 1: Informations Générales & Image -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Colonne Informations Générales -->
+                    <div class="lg:col-span-2 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-6">
+                        <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-tag text-indigo-500"></i> Informations Générales
+                        </h3>
+                        
+                        <div>
+                            <label for="nom" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">Nom du produit <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-box text-indigo-400"></i></div>
+                                <input type="text" id="nom" name="nom" value="{{ old('nom') }}" placeholder="Ex: Coca-Cola 1.5L" required class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('nom') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="reference" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">Référence <span class="text-red-500">*</span></label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-barcode text-indigo-400"></i></div>
+                                    <input type="text" id="reference" name="reference" value="{{ old('reference') }}" placeholder="Ex: COCA-1.5L" required class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                                </div>
+                                @error('reference') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="code_barres" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">Code-barres</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-qrcode text-indigo-400"></i></div>
+                                    <input type="text" id="code_barres" name="code_barres" value="{{ old('code_barres') }}" placeholder="Ex: 5410123456789" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                                </div>
+                                @error('code_barres') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="categorie_id" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">Catégorie <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-tags text-indigo-400"></i></div>
+                                <select id="categorie_id" name="categorie_id" required class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                                    <option value="">Sélectionner une catégorie</option>
+                                    @foreach($categories as $categorie)
+                                        <option value="{{ $categorie->id }}" {{ old('categorie_id') == $categorie->id ? 'selected' : '' }}>{{ $categorie->nom }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('categorie_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="description" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">Description</label>
+                            <div class="relative">
+                                <div class="absolute top-3 left-3 text-indigo-400"><i class="fas fa-align-left"></i></div>
+                                <textarea id="description" name="description" rows="4" placeholder="Description détaillée du produit..." class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">{{ old('description') }}</textarea>
+                            </div>
+                            @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <!-- Colonne Image -->
+                    <div class="lg:col-span-1 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-4">
+                        <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-image text-indigo-500"></i> Image du Produit
+                        </h3>
+                        <div class="flex flex-col items-center">
+                            <div id="imagePreviewContainer" class="w-full h-64 mb-4 border-2 border-dashed border-indigo-300 rounded-lg flex items-center justify-center bg-indigo-50/50 overflow-hidden">
+                                <img id="imagePreview" src="{{ asset('assets/img/placeholder-image.png') }}" alt="Aperçu de l'image" class="max-h-full max-w-full object-contain {{ old('image') ? '' : 'hidden' }}">
+                                <span id="imagePreviewPlaceholder" class="{{ old('image') ? 'hidden' : 'text-indigo-400 text-center p-4' }}">
+                                    <i class="fas fa-cloud-upload-alt fa-3x mb-2"></i><br>
+                                    Cliquez ou glissez-déposez une image
+                                </span>
+                            </div>
+                            <input type="file" name="image" id="image" class="hidden" accept="image/*" onchange="previewImage(this);">
+                            <label for="image" class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-tr from-blue-500 to-teal-400 text-white rounded-lg shadow-md hover:shadow-neon hover:-translate-y-1 transition-all">
+                                <i class="fas fa-upload"></i> Choisir une image
+                            </label>
+                            @error('image') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Détails & Spécifications -->
+                <div class="bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-semibold text-indigo-900 mb-6 flex items-center gap-2">
+                        <i class="fas fa-box-open text-indigo-500"></i> Détails & Spécifications
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div>
+                            <label for="unite_mesure" class="block text-sm font-medium text-indigo-700 mb-1">Unité de mesure</label>
+                            <select name="unite_mesure" id="unite_mesure" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                                <option value="Pièce" {{ old('unite_mesure') == 'Pièce' ? 'selected' : '' }}>Pièce</option>
+                                <option value="KG" {{ old('unite_mesure') == 'KG' ? 'selected' : '' }}>Kilogramme (KG)</option>
+                                <option value="Litre" {{ old('unite_mesure') == 'Litre' ? 'selected' : '' }}>Litre (L)</option>
+                                <option value="Paquet" {{ old('unite_mesure') == 'Paquet' ? 'selected' : '' }}>Paquet</option>
+                                <option value="Carton" {{ old('unite_mesure') == 'Carton' ? 'selected' : '' }}>Carton</option>
+                                <option value="Autre" {{ old('unite_mesure') == 'Autre' ? 'selected' : '' }}>Autre</option>
+                            </select>
+                            @error('unite_mesure') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div id="valeur_mesure_container" class="{{ old('unite_mesure') == 'Autre' ? '' : 'hidden' }}">
+                            <label for="valeur_mesure" class="block text-sm font-medium text-indigo-700 mb-1">Précisez l'unité</label>
+                            <input type="text" name="valeur_mesure" id="valeur_mesure" value="{{ old('valeur_mesure') }}" placeholder="Ex: Bouteille de 75cl" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('valeur_mesure') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="unite_vente_id" class="block text-sm font-medium text-indigo-700 mb-1">Unité de vente <span class="text-red-500">*</span></label>
+                            <select name="unite_vente_id" id="unite_vente_id" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                                <option value="">Sélectionner une unité de vente</option>
+                                @foreach($unites_vente as $unite_vente)
+                                    <option value="{{ $unite_vente->id }}" {{ old('unite_vente_id') == $unite_vente->id ? 'selected' : '' }}>{{ $unite_vente->nom }}</option>
+                                @endforeach
+                            </select>
+                            @error('unite_vente_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="quantite_par_conditionnement" class="block text-sm font-medium text-indigo-700 mb-1">Quantité par conditionnement <span class="text-red-500">*</span></label>
+                            <input type="number" id="quantite_par_conditionnement" name="quantite_par_conditionnement" value="{{ old('quantite_par_conditionnement') }}" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('quantite_par_conditionnement') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="poids" class="block text-sm font-medium text-indigo-700 mb-1">Poids (kg)</label>
+                            <input type="number" step="0.01" name="poids" id="poids" value="{{ old('poids') }}" placeholder="Ex: 1.5" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('poids') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="volume" class="block text-sm font-medium text-indigo-700 mb-1">Volume (L)</label>
+                            <input type="number" step="0.01" name="volume" id="volume" value="{{ old('volume') }}" placeholder="Ex: 0.75" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('volume') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="fournisseur_id" class="block text-sm font-medium text-indigo-700 mb-1">Fournisseur</label>
+                            <select name="fournisseur_id" id="fournisseur_id" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                                <option value="">Aucun</option>
+                                @foreach($fournisseurs as $fournisseur)
+                                    <option value="{{ $fournisseur->id }}" {{ old('fournisseur_id') == $fournisseur->id ? 'selected' : '' }}>{{ $fournisseur->nom }}</option>
+                                @endforeach
+                            </select>
+                            @error('fournisseur_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="marque_id" class="block text-sm font-medium text-indigo-700 mb-1">Marque</label>
+                            <select name="marque_id" id="marque_id" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                                <option value="">Aucune</option>
+                                @foreach($marques as $marque)
+                                    <option value="{{ $marque->id }}" {{ old('marque_id') == $marque->id ? 'selected' : '' }}>{{ $marque->nom }}</option>
+                                @endforeach
+                            </select>
+                            @error('marque_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="conditionnement_fournisseur" class="block text-sm font-medium text-indigo-700 mb-1">Conditionnement fournisseur <span class="text-red-500">*</span></label>
+                            <input type="text" id="conditionnement_fournisseur" name="conditionnement_fournisseur" value="{{ old('conditionnement_fournisseur') }}" placeholder="Ex: Carton de 24" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('conditionnement_fournisseur') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Section 3: Tarification -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                    <div class="lg:col-span-3 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-6">
+                        <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-dollar-sign text-indigo-500"></i> Tarification
+                        </h3>
+                        <div>
+                            <label for="prix_achat_ht" class="block text-sm font-medium text-indigo-700 mb-1">Prix d'achat HT <span class="text-red-500">*</span></label>
+                            <input type="number" step="any" id="prix_achat_ht" name="prix_achat_ht" value="{{ old('prix_achat_ht') }}" placeholder="0" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('prix_achat_ht') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="marge" class="block text-sm font-medium text-indigo-700 mb-1">Marge (%) <span class="text-red-500">*</span></label>
+                            <input type="number" step="any" id="marge" name="marge" value="{{ old('marge', 20) }}" placeholder="20" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('marge') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="tva" class="block text-sm font-medium text-indigo-700 mb-1">TVA (%) <span class="text-red-500">*</span></label>
+                            <input type="number" step="any" id="tva" name="tva" value="{{ old('tva', 18) }}" placeholder="18" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('tva') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-white/70 backdrop-blur-md border border-green-200 rounded-xl shadow-lg p-6 space-y-4">
+                        <h3 class="text-xl font-semibold text-green-700 mb-4 flex items-center gap-2">
+                            <i class="fas fa-receipt text-green-500"></i> Récapitulatif Prix de Vente
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                <span class="text-sm font-medium text-gray-600">Prix de Vente HT:</span>
+                                <span id="prix_vente_ht_display" class="text-lg font-bold text-green-800">0 FCFA</span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                <span class="text-sm font-medium text-gray-600">Prix de Vente TTC:</span>
+                                <span id="prix_vente_ttc_display" class="text-xl font-extrabold text-green-600">0 FCFA</span>
+                            </div>
+                        </div>
+                        <hr class="my-4 border-green-200">
+                        <div id="priceCalculationDetails" class="text-xs text-gray-600 space-y-1">
+                            <p>Achat HT: <span id="detail_prix_achat_ht" class="font-semibold">0 FCFA</span></p>
+                            <p>Marge (<span id="detail_marge_pourcentage">0</span>%): <span id="detail_marge_valeur" class="font-semibold">0 FCFA</span></p>
+                            <p>Sous-total HT: <span id="detail_sous_total_ht" class="font-semibold">0 FCFA</span></p>
+                            <p>TVA (<span id="detail_tva_pourcentage">0</span>%): <span id="detail_tva_valeur" class="font-semibold">0 FCFA</span></p>
+                            <p class="font-bold text-sm">Total TTC: <span id="detail_total_ttc" class="font-semibold">0 FCFA</span></p>
+                        </div>
+                        <input type="hidden" name="prix_vente_ht" id="prix_vente_ht">
+                        <input type="hidden" name="prix_vente_ttc" id="prix_vente_ttc">
+                        <input type="hidden" name="valeur_marge" id="valeur_marge">
+                        <input type="hidden" name="valeur_tva" id="valeur_tva">
+                    </div>
+                </div>
+
+                <!-- Section 4: Stock Initial & Emplacement -->
+                <div class="bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-semibold text-indigo-900 mb-6 flex items-center gap-2">
+                        <i class="fas fa-warehouse text-indigo-500"></i> Stock Initial & Emplacement
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div>
+                            <label for="stock_initial" class="block text-sm font-medium text-indigo-700 mb-1">Stock initial <span class="text-red-500">*</span></label>
+                            <input type="number" id="stock_initial" name="stock_initial" value="{{ old('stock_initial', 0) }}" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('stock_initial') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="seuil_alerte" class="block text-sm font-medium text-indigo-700 mb-1">Seuil d'alerte <span class="text-red-500">*</span></label>
+                            <input type="number" id="seuil_alerte" name="seuil_alerte" value="{{ old('seuil_alerte', 10) }}" required class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('seuil_alerte') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="date_peremption" class="block text-sm font-medium text-indigo-700 mb-1">Date de péremption</label>
+                            <input type="date" id="date_peremption" name="date_peremption" value="{{ old('date_peremption') }}" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('date_peremption') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            
+                            <div class="mt-4">
+                                <label for="delai_alerte_peremption" class="block text-sm font-medium text-indigo-700 mb-1">Délai d'alerte avant péremption (jours)</label>
+                                <div class="flex items-center">
+                                    <input type="number" id="delai_alerte_peremption" name="delai_alerte_peremption" value="{{ old('delai_alerte_peremption') }}" min="1" max="365" placeholder="30" class="block w-1/2 rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                                    <span class="ml-2 text-sm text-gray-500">Vide = 30 jours par défaut</span>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-500">Spécifiez combien de jours avant la péremption l'alerte doit être déclenchée</p>
+                                @error('delai_alerte_peremption') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+                        <div>
+                            <label for="emplacement_rayon" class="block text-sm font-medium text-indigo-700 mb-1">Emplacement Rayon</label>
+                            <input type="text" id="emplacement_rayon" name="emplacement_rayon" value="{{ old('emplacement_rayon') }}" placeholder="Ex: R03" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('emplacement_rayon') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label for="emplacement_etagere" class="block text-sm font-medium text-indigo-700 mb-1">Emplacement Étagère</label>
+                            <input type="text" id="emplacement_etagere" name="emplacement_etagere" value="{{ old('emplacement_etagere') }}" placeholder="Ex: E05" class="block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm">
+                            @error('emplacement_etagere') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bouton Soumettre -->
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-tr from-green-500 to-emerald-600 text-white font-bold text-lg shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                        <i class="fas fa-save"></i>
+                        Enregistrer le Produit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion de l'affichage du champ "valeur_mesure"
+    const uniteMesureEl = document.getElementById('unite_mesure');
+    const valeurMesureContainerEl = document.getElementById('valeur_mesure_container');
+    if (uniteMesureEl && valeurMesureContainerEl) {
+        uniteMesureEl.addEventListener('change', function() {
+            if (this.value === 'Autre') {
+                valeurMesureContainerEl.classList.remove('hidden');
+            } else {
+                valeurMesureContainerEl.classList.add('hidden');
+            }
+        });
+        // Trigger change on load if 'Autre' is pre-selected
+        if (uniteMesureEl.value === 'Autre') {
+             valeurMesureContainerEl.classList.remove('hidden');
+        }
+    }
+
+    // Script de calcul des prix (adapté de la version précédente)
+    const prixAchatHtEl = document.getElementById('prix_achat_ht');
+    const margeEl = document.getElementById('marge');
+    const tvaEl = document.getElementById('tva');
+    
+    const prixVenteHtDisplayEl = document.getElementById('prix_vente_ht_display');
+    const prixVenteTtcDisplayEl = document.getElementById('prix_vente_ttc_display');
+    
+    const detailPrixAchatHtEl = document.getElementById('detail_prix_achat_ht');
+    const detailMargePourcentageEl = document.getElementById('detail_marge_pourcentage');
+    const detailMargeValeurEl = document.getElementById('detail_marge_valeur');
+    const detailSousTotalHtEl = document.getElementById('detail_sous_total_ht');
+    const detailTvaPourcentageEl = document.getElementById('detail_tva_pourcentage');
+    const detailTvaValeurEl = document.getElementById('detail_tva_valeur');
+    const detailTotalTtcEl = document.getElementById('detail_total_ttc');
+
+    const hiddenPrixVenteHtEl = document.getElementById('prix_vente_ht');
+    const hiddenPrixVenteTtcEl = document.getElementById('prix_vente_ttc');
+    const hiddenValeurMargeEl = document.getElementById('valeur_marge');
+    const hiddenValeurTvaEl = document.getElementById('valeur_tva');
+
+    function formatCurrency(value, currencyCode = 'XOF', minDigits = 0, maxDigits = 0) {
+        try {
+            const numValue = parseFloat(value);
+            if (isNaN(numValue)) return '0 FCFA'; // Fallback for NaN
+            return numValue.toLocaleString('fr-FR', {
+                style: 'currency',
+                currency: currencyCode,
+                minimumFractionDigits: minDigits,
+                maximumFractionDigits: maxDigits,
+            }).replace(currencyCode, '').trim() + ' FCFA';
+        } catch (e) {
+            console.warn('toLocaleString error, falling back to basic formatting for value:', value, e);
+            const numValue = parseFloat(value);
+            if (isNaN(numValue)) return '0 FCFA';
+            // Basic fallback: round and add spaces for thousands separators
+            let parts = Math.round(numValue).toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            return parts.join(".") + ' FCFA';
+        }
+    }
+
+    function calculateAndDisplayPrices() {
+        if (!prixAchatHtEl || !margeEl || !tvaEl || 
+            !prixVenteHtDisplayEl || !prixVenteTtcDisplayEl ||
+            !detailPrixAchatHtEl || !detailMargeValeurEl || !detailMargePourcentageEl ||
+            !detailSousTotalHtEl || !detailTvaPourcentageEl || !detailTvaValeurEl || !detailTotalTtcEl ||
+            !hiddenPrixVenteHtEl || !hiddenPrixVenteTtcEl || !hiddenValeurMargeEl || !hiddenValeurTvaEl) {
+            // console.warn('One or more price calculation elements are missing from the DOM.');
+            return;
+        }
+
+        const prixAchatHt = parseFloat(prixAchatHtEl.value) || 0;
+        const margePourcentage = parseFloat(margeEl.value) || 0;
+        const tvaPourcentage = parseFloat(tvaEl.value) || 0;
+
+        const valeurMarge = prixAchatHt * (margePourcentage / 100);
+        const prixVenteHt = prixAchatHt + valeurMarge;
+        const valeurTva = prixVenteHt * (tvaPourcentage / 100);
+        const prixVenteTtc = prixVenteHt + valeurTva;
+
+        prixVenteHtDisplayEl.textContent = formatCurrency(prixVenteHt);
+        prixVenteTtcDisplayEl.textContent = formatCurrency(prixVenteTtc);
+        
+        detailPrixAchatHtEl.textContent = formatCurrency(prixAchatHt);
+        detailMargePourcentageEl.textContent = margePourcentage;
+        detailMargeValeurEl.textContent = formatCurrency(valeurMarge);
+        detailSousTotalHtEl.textContent = formatCurrency(prixVenteHt); // Sous-total HT est le prix de vente HT
+        detailTvaPourcentageEl.textContent = tvaPourcentage;
+        detailTvaValeurEl.textContent = formatCurrency(valeurTva);
+        detailTotalTtcEl.textContent = formatCurrency(prixVenteTtc);
+
+        hiddenPrixVenteHtEl.value = prixVenteHt.toFixed(2);
+        hiddenPrixVenteTtcEl.value = prixVenteTtc.toFixed(2);
+        hiddenValeurMargeEl.value = valeurMarge.toFixed(2);
+        hiddenValeurTvaEl.value = valeurTva.toFixed(2);
+    }
+
+    [prixAchatHtEl, margeEl, tvaEl].forEach(el => {
+        if (el) {
+            el.addEventListener('input', calculateAndDisplayPrices);
+        }
+    });
+
+    // Initial calculation on page load
+    calculateAndDisplayPrices();
+
+
+    // Image Preview Script
+    const imageInput = document.getElementById('image');
+    const imagePreviewEl = document.getElementById('imagePreview');
+    const imagePreviewPlaceholderEl = document.getElementById('imagePreviewPlaceholder');
+    const imagePreviewContainerEl = document.getElementById('imagePreviewContainer');
+
+    window.previewImage = function(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if(imagePreviewEl && imagePreviewPlaceholderEl) {
+                    imagePreviewEl.src = e.target.result;
+                    imagePreviewEl.classList.remove('hidden');
+                    imagePreviewPlaceholderEl.classList.add('hidden');
+                }
+            }
+            reader.readAsDataURL(input.files[0]);
+        } else {
+             if(imagePreviewEl && imagePreviewPlaceholderEl) {
+                imagePreviewEl.src = "{{ asset('assets/img/placeholder-image.png') }}"; // Default or placeholder
+                imagePreviewEl.classList.add('hidden');
+                imagePreviewPlaceholderEl.classList.remove('hidden');
+            }
+        }
+    }
+    
+    // Drag and drop for image
+    if (imagePreviewContainerEl && imageInput) {
+        imagePreviewContainerEl.addEventListener('click', () => imageInput.click());
+
+        imagePreviewContainerEl.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            imagePreviewContainerEl.classList.add('border-blue-500', 'bg-blue-50');
+        });
+
+        imagePreviewContainerEl.addEventListener('dragleave', () => {
+            imagePreviewContainerEl.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+
+        imagePreviewContainerEl.addEventListener('drop', (event) => {
+            event.preventDefault();
+            imagePreviewContainerEl.classList.remove('border-blue-500', 'bg-blue-50');
+            if (event.dataTransfer.files.length > 0) {
+                imageInput.files = event.dataTransfer.files;
+                previewImage(imageInput); // Trigger preview
+            }
+        });
+    }
+     // If there's an old image value (e.g., validation error), trigger preview
+    @if(old('image_preview_src'))
+        if(imagePreviewEl && imagePreviewPlaceholderEl) {
+            imagePreviewEl.src = "{{ old('image_preview_src') }}";
+            imagePreviewEl.classList.remove('hidden');
+            imagePreviewPlaceholderEl.classList.add('hidden');
+        }
+    @elseif(isset($produit) && $produit->image_url)
+        if(imagePreviewEl && imagePreviewPlaceholderEl) {
+            imagePreviewEl.src = "{{ $produit->image_url }}";
+            imagePreviewEl.classList.remove('hidden');
+            imagePreviewPlaceholderEl.classList.add('hidden');
+        }
+    @endif
+
+});
+</script>
+@endpush
+
+@push('styles')
+<style>
+    /* Style pour s'assurer que l'image d'aperçu ne dépasse pas son conteneur */
+    #imagePreview {
+        object-fit: contain; /* ou 'cover' selon le rendu souhaité */
+    }
+    /* Amélioration visuelle pour le drag & drop */
+    #imagePreviewContainer.border-blue-500 {
+        border-color: #3b82f6; /* blue-500 */
+    }
+    #imagePreviewContainer.bg-blue-50 {
+        background-color: #eff6ff; /* blue-50 */
+    }
+</style>
+@endpush

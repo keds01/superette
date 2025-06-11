@@ -1,0 +1,502 @@
+@extends('layouts.app')
+
+@section('title', 'Tableau de bord')
+
+@section('content')
+<div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header avec date et bienvenue -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+            <div>
+                <h1 class="text-4xl font-extrabold bg-gradient-to-tr from-indigo-600 via-purple-500 to-pink-400 bg-clip-text text-transparent tracking-tight drop-shadow-lg">
+                    Bienvenue, {{ Auth::user()->name }}
+                </h1>
+                <p class="mt-2 text-lg text-gray-600">{{ date('d F Y') }} | Superette « Le Marché Togolais »</p>
+            </div>
+            <div class="mt-4 md:mt-0">
+                <a href="{{ route('ventes.create') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-lg hover:shadow-indigo-500/20 hover:-translate-y-1 transition-all duration-200">
+                    <i class="fas fa-cash-register"></i>
+                    Nouvelle vente
+                </a>
+            </div>
+        </div>
+        
+        <!-- Alertes importantes - section cliquable qui redirige vers la page concernée -->
+        @if(count($notifications) > 0)
+        <div class="mb-8">
+            <div class="bg-white overflow-hidden shadow-sm rounded-xl">
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                        <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                        Alertes importantes
+                    </h3>
+                    <div class="space-y-3">
+                        @foreach($notifications as $index => $notification)
+                            @if($index < 3) <!-- Affiche seulement les 3 premières notifications -->
+                            <a href="{{ route('alertes.index') }}" class="block">
+                                <div class="flex items-start p-4 rounded-lg hover:bg-indigo-50/50 transition-colors {{ ($notification['severite'] ?? 'basse') === 'haute' ? 'bg-red-50 border border-red-200' : (($notification['severite'] ?? 'basse') === 'moyenne' ? 'bg-yellow-50 border border-yellow-200' : 'bg-indigo-50 border border-indigo-200') }}">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-circle text-xl {{ ($notification['severite'] ?? 'basse') === 'haute' ? 'text-red-500' : (($notification['severite'] ?? 'basse') === 'moyenne' ? 'text-yellow-500' : 'text-indigo-500') }}"></i>
+                                    </div>
+                                    <div class="ml-4 flex-1">
+                                        <p class="text-sm font-medium text-gray-800">{{ $notification['message'] }}</p>
+                                        <p class="mt-1 text-xs text-gray-500">{{ $notification['created_at'] ?? now()->format('d/m/Y H:i') }}</p>
+                                    </div>
+                                </div>
+                            </a>
+                            @endif
+                        @endforeach
+                        
+                        @if(count($notifications) > 3)
+                            <a href="{{ route('alertes.index') }}" class="block text-center text-sm font-medium text-indigo-600 hover:text-indigo-800 mt-2">
+                                Voir toutes les {{ count($notifications) }} alertes
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
+    <!-- Bloc unifié des alertes -->
+    @if(count($notifications) > 0)
+    <div class="mb-6">
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    Alertes et Notifications
+                </h3>
+                <div x-data="{ expanded: false }" class="space-y-4">
+                    <button @click="expanded = !expanded" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 focus:outline-none flex items-center gap-1">
+                        <span x-text="expanded ? 'Masquer les détails' : 'Afficher les détails'"></span>
+                        <span x-show="!expanded && {{ count($notifications) }} > 0" class="text-xs bg-red-500 text-white rounded-full px-2 py-0.5">
+                            {{ count($notifications) }}
+                        </span>
+                        <svg x-cloak x-show="expanded" class="inline-block w-4 h-4 ml-1 transform rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        <svg x-cloak x-show="!expanded" class="inline-block w-4 h-4 ml-1 transform transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div x-show="expanded" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform -translate-y-2" class="space-y-4 mt-2">
+                        @foreach($notifications as $notification)
+                        <div class="flex items-start p-4 rounded-lg {{ ($notification['severite'] ?? 'basse') === 'haute' ? 'bg-red-50 border border-red-200' : (($notification['severite'] ?? 'basse') === 'moyenne' ? 'bg-yellow-50 border border-yellow-200' : 'bg-indigo-50 border border-indigo-200') }}">
+                            <div class="flex-shrink-0">
+                                <svg class="h-6 w-6 {{ ($notification['severite'] ?? 'basse') === 'haute' ? 'text-red-400' : (($notification['severite'] ?? 'basse') === 'moyenne' ? 'text-yellow-400' : 'text-indigo-400') }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div class="ml-3 flex-1">
+                                <p class="text-sm font-medium {{ ($notification['severite'] ?? 'basse') === 'haute' ? 'text-red-800' : (($notification['severite'] ?? 'basse') === 'moyenne' ? 'text-yellow-800' : 'text-indigo-800') }}">
+                                    {{ $notification['message'] }}
+                                </p>
+                                <p class="mt-1 text-xs {{ ($notification['severite'] ?? 'basse') === 'haute' ? 'text-red-600' : (($notification['severite'] ?? 'basse') === 'moyenne' ? 'text-yellow-600' : 'text-indigo-600') }}">
+                                    {{ $notification['created_at'] ?? '' }}
+                                </p>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Tuiles d'accès rapide -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Caisse -->
+        <a href="{{ route('ventes.index') }}" class="block transform hover:scale-105 transition-all duration-200">
+            <div class="bg-gradient-to-br from-indigo-50 to-white rounded-xl shadow-md border border-indigo-100 p-6 h-full flex flex-col justify-between">
+                <div class="mb-2">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
+                        <i class="fas fa-cash-register text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-800">Caisse</h3>
+                    <p class="text-sm text-gray-500 mt-1">Gérer les ventes et encaissements</p>
+                </div>
+                <div class="text-sm font-bold text-indigo-600">
+                    <div class="flex justify-between items-center">
+                        <span>Accéder à la caisse</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Stock -->
+        <a href="{{ route('products.index') }}" class="block transform hover:scale-105 transition-all duration-200">
+            <div class="bg-gradient-to-br from-purple-50 to-white rounded-xl shadow-md border border-purple-100 p-6 h-full flex flex-col justify-between">
+                <div class="mb-2">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 text-purple-600 mb-4">
+                        <i class="fas fa-boxes text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-800">Stock</h3>
+                    <p class="text-sm text-gray-500 mt-1">Gérer l'inventaire et les produits</p>
+                </div>
+                <div class="text-sm font-bold text-purple-600">
+                    <div class="flex justify-between items-center">
+                        <span>Voir l'inventaire</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Clients -->
+        <a href="{{ route('clients.index') }}" class="block transform hover:scale-105 transition-all duration-200">
+            <div class="bg-gradient-to-br from-pink-50 to-white rounded-xl shadow-md border border-pink-100 p-6 h-full flex flex-col justify-between">
+                <div class="mb-2">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-pink-100 text-pink-600 mb-4">
+                        <i class="fas fa-users text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-800">Clients</h3>
+                    <p class="text-sm text-gray-500 mt-1">Gérer les clients et leur fidélité</p>
+                </div>
+                <div class="text-sm font-bold text-pink-600">
+                    <div class="flex justify-between items-center">
+                        <span>Liste des clients</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+
+        <!-- Rapports -->
+        <a href="{{ route('rapports.index') }}" class="block transform hover:scale-105 transition-all duration-200">
+            <div class="bg-gradient-to-br from-blue-50 to-white rounded-xl shadow-md border border-blue-100 p-6 h-full flex flex-col justify-between">
+                <div class="mb-2">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 mb-4">
+                        <i class="fas fa-chart-line text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-800">Rapports</h3>
+                    <p class="text-sm text-gray-500 mt-1">Statistiques et rapports financiers</p>
+                </div>
+                <div class="text-sm font-bold text-blue-600">
+                    <div class="flex justify-between items-center">
+                        <span>Voir les rapports</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="flex justify-between items-center mb-8">
+        <div class="flex items-center gap-6">
+            <h2 class="text-3xl font-bold bg-gradient-to-tr from-indigo-400 to-purple-600 bg-clip-text text-transparent tracking-tight flex items-center gap-3 animate-fade-in">
+                <svg class="w-8 h-8 text-indigo-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Tableau de bord
+            </h2>
+            
+            <!-- Bouton Nouvelle vente rapide -->
+            <a href="{{ route('ventes.create') }}" 
+               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold shadow-lg hover:shadow-xl hover:from-green-600 hover:to-emerald-600 transition-all transform hover:scale-105">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Nouvelle vente rapide
+            </a>
+            
+            <!-- Bouton Accès Caisse pour Admin -->
+            @if(auth()->check() && auth()->user()->hasRole('admin'))
+            <a href="{{ route('caisse.index') }}" 
+               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 3v2m10-2v2m-9 8h10M7 14h10m-9 4h10M6 21h12a1 1 0 001-1V6a1 1 0 00-1-1H6a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                </svg>
+                Accéder à la caisse
+            </a>
+            @endif
+        </div>
+        <div class="flex gap-3 items-center">
+            <a href="{{ route('alertes.index') }}" class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-lg hover:scale-105 hover:from-indigo-500 hover:to-purple-400 transition-all duration-200">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6 6M7.5 7.5l9 9" /></svg>
+                Gérer les alertes
+            </a>
+            <button onclick="document.getElementById('filterModal').classList.remove('hidden')" class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold shadow-lg hover:scale-105 hover:from-blue-500 hover:to-indigo-400 transition-all duration-200">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" /></svg>
+                Filtres
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistiques clés -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <!-- Valeur totale du stock -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-gray-700">Valeur du stock</h3>
+                        <p class="text-2xl font-bold text-gray-900">{{ number_format($stockValue, 0, ',', ' ') }} FCFA</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nombre total de produits -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-gray-700">Total produits</h3>
+                        <p class="text-2xl font-bold text-gray-900">{{ $totalProducts }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Produits en alerte -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-red-100 text-red-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-gray-700">En alerte</h3>
+                        <p class="text-2xl font-bold text-gray-900">{{ $lowStockCount }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Produits à péremption -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-gray-700">À péremption</h3>
+                        <p class="text-2xl font-bold text-gray-900">{{ $expiringCount }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableaux détaillés -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Produits en alerte -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Produits en alerte de stock</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produit</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock actuel</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Seuil d'alerte</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach($lowStockProducts as $product)
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{{ $product->nom }}</div>
+                                    <div class="text-sm text-gray-500">{{ $product->categorie->nom }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ $product->stock }} {{ $product->uniteVente->symbole }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ $product->seuil_alerte }} {{ $product->uniteVente->symbole }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <a href="{{ route('stock-movements.create', ['product' => $product->id]) }}" class="text-indigo-600 hover:text-indigo-900">Réapprovisionner</a>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Produits à péremption -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Produits à péremption proche</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produit</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date péremption</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jours restants</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach($expiringProducts as $product)
+                                @foreach($product->stockMovements->whereNotNull('date_peremption') as $movement)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ $product->nom }}</div>
+                                        <div class="text-sm text-gray-500">{{ $product->categorie->nom }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">{{ $movement->quantite }} {{ $product->uniteVente->symbole }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">{{ $movement->date_peremption->format('d/m/Y') }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">
+                                            {{ $movement->date_peremption->diffInDays(now()) }} jours
+                                        </div>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphiques -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Évolution des mouvements -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Évolution des mouvements (30 derniers jours)</h3>
+                <div style="height: 400px;">
+                    <canvas id="movementsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distribution par catégorie -->
+        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Distribution par catégorie</h3>
+                <div style="height: 400px;">
+                    <canvas id="categoriesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal des filtres -->
+    <div id="filterModal" class="hidden fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Filtres</h3>
+                    <form id="filterForm" class="space-y-4">
+                        <div>
+                            <label for="date_debut" class="block text-sm font-medium text-gray-700">Date de début</label>
+                            <input type="date" name="date_debut" id="date_debut" value="{{ request('date_debut', now()->subDays(30)->format('Y-m-d')) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        </div>
+                        <div>
+                            <label for="date_fin" class="block text-sm font-medium text-gray-700">Date de fin</label>
+                            <input type="date" name="date_fin" id="date_fin" value="{{ request('date_fin', now()->format('Y-m-d')) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        </div>
+                        <div>
+                            <label for="categorie" class="block text-sm font-medium text-gray-700">Catégorie</label>
+                            <select name="categorie" id="categorie" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                <option value="">Toutes les catégories</option>
+                                @foreach($categories as $categorie)
+                                    <option value="{{ $categorie->id }}" {{ request('categorie') == $categorie->id ? 'selected' : '' }}>{{ $categorie->nom }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" onclick="applyFilters()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Appliquer
+                    </button>
+                    <button type="button" onclick="document.getElementById('filterModal').classList.add('hidden')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Annuler
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Graphique des mouvements
+        const movementsCtx = document.getElementById('movementsChart').getContext('2d');
+        new Chart(movementsCtx, {
+            type: 'line',
+            data: {
+                labels: {!! json_encode($movementsChart['labels']) !!},
+                datasets: [{
+                    label: 'Entrées',
+                    data: {!! json_encode($movementsChart['entrees']) !!},
+                    borderColor: 'rgb(34, 197, 94)',
+                    tension: 0.1
+                }, {
+                    label: 'Sorties',
+                    data: {!! json_encode($movementsChart['sorties']) !!},
+                    borderColor: 'rgb(239, 68, 68)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        // Graphique des catégories
+        const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+        new Chart(categoriesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {!! json_encode($categoriesChart['labels']) !!},
+                datasets: [{
+                    data: {!! json_encode($categoriesChart['data']) !!},
+                    backgroundColor: [
+                        'rgb(59, 130, 246)',
+                        'rgb(16, 185, 129)',
+                        'rgb(245, 158, 11)',
+                        'rgb(239, 68, 68)',
+                        'rgb(139, 92, 246)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        function applyFilters() {
+            const form = document.getElementById('filterForm');
+            const formData = new FormData(form);
+            const params = new URLSearchParams(formData);
+            window.location.href = `${window.location.pathname}?${params.toString()}`;
+        }
+
+        window.movementsChartData = @json($movementsChart);
+        window.categoriesChartData = @json($categoriesChart);
+    </script>
+    @endpush
+@endsection 

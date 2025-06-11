@@ -1,0 +1,430 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Produit;
+use App\Models\Vente;
+use App\Models\Paiement;
+use App\Models\MouvementStock;
+use App\Models\User;
+use App\Models\ActivityLog;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+
+class AuditService
+{
+    /**
+     * Enregistre une activité dans le journal
+     * 
+     * @param string $type Type d'activité (connexion, modification, etc.)
+     * @param string $description Description de l'activité
+     * @param string $model_type Type de modèle concerné
+     * @param int|null $model_id ID du modèle concerné
+     * @param User $user Utilisateur ayant effectué l'action
+     * @param array $metadata Métadonnées additionnelles
+     * @return ActivityLog
+     */
+    public function logActivity($type, $description, $model_type, $model_id, $user, $metadata = [])
+    {
+        $activityLog = new \App\Models\ActivityLog([
+            'type' => $type,
+            'description' => $description,
+            'user_id' => $user->id,
+            'model_type' => $model_type,
+            'model_id' => $model_id,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'metadata' => json_encode($metadata)
+        ]);
+        
+        $activityLog->save();
+        
+        return $activityLog;
+    }
+    
+    /**
+     * Détecte des anomalies dans les activités récentes
+     * 
+     * @return array Liste des anomalies détectées
+     */
+    public function detecterAnomalies()
+    {
+        $anomalies = [];
+        
+        // 1. Variations de prix >10% en 24h
+        $this->detecterVariationsPrix($anomalies);
+        
+        // 2. Séries d'annulations suspectes
+        $this->detecterAnnulationsSuspectes($anomalies);
+        
+        // 3. Ajustements de stock massifs (>20%)
+        $this->detecterAjustementsStockMassifs($anomalies);
+        
+        return $anomalies;
+    }
+    
+    /**
+     * Détecte les variations de prix importantes (>10%) en 24h
+     * 
+     * @param array &$anomalies Tableau d'anomalies à compléter
+     */
+    private function detecterVariationsPrix(&$anomalies)
+    {
+        // Récupérer les produits dont le prix a changé récemment
+        $hier = Carbon::now()->subDay();
+        $produits = Produit::whereHas('mouvementsStock', function ($query) use ($hier) {
+            $query->where('created_at', '>=', $hier)
+                ->where('type', 'like', '%ajustement%');
+        })->get();
+        
+        foreach ($produits as $produit) {
+            // Récupérer l'historique des prix
+            $mouvements = $produit->mouvementsStock()
+                ->where('created_at', '>=', $hier)
+                ->where('type', 'like', '%ajustement%')
+                ->orderBy('created_at', 'asc')
+                ->get();
+            
+            if ($mouvements->count() >= 2) {
+                $premier = $mouvements->first();
+                $dernier = $mouvements->last();
+                
+                if ($premier->prix_unitaire > 0 && $dernier->prix_unitaire > 0) {
+                    $variation = abs(($dernier->prix_unitaire - $premier->prix_unitaire) / $premier->prix_unitaire * 100);
+                    
+                    if ($variation > 10) {
+                        $anomalies[] = [
+                            'type' => 'variation_prix',
+                            'severite' => 'moyenne',
+                            'message' => "Variation de prix importante ({$variation}%) pour le produit {$produit->nom} en moins de 24h",
+                            'details' => [
+                                'produit_id' => $produit->id,
+                                'produit_nom' => $produit->nom,
+                                'ancien_prix' => $premier->prix_unitaire,
+                                'nouveau_prix' => $dernier->prix_unitaire,
+                                'variation' => $variation,
+                                'date_premier' => $premier->created_at,
+                                'date_dernier' => $dernier->created_at
+                            ]
+                        ];
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Détecte les séries d'annulations suspectes
+     * 
+     * @param array &$anomalies Tableau d'anomalies à compléter
+     */
+    private function detecterAnnulationsSuspectes(&$anomalies)
+    {
+        // Récupérer les annulations des dernières 24h, groupées par employé
+        $hier = Carbon::now()->subDay();
+        
+        $utilisateursAnnulations = Vente::where('statut', 'annulee')
+            ->where('updated_at', '>=', $hier)
+            ->select('employe_id', DB::raw('count(*) as nb_annulations'), DB::raw('sum(montant_total) as montant_total'))
+            ->groupBy('employe_id')
+            ->having('nb_annulations', '>=', 3) // Seuil de suspicion: 3 annulations ou plus
+            ->get();
+        
+        foreach ($utilisateursAnnulations as $ua) {
+            $employe = \App\Models\Employe::find($ua->employe_id);
+            $username = $employe ? "{$employe->prenom} {$employe->nom}" : "Employé #{$ua->employe_id}";
+            
+            // Récupérer les ventes annulées pour cet employé
+            $ventesAnnulees = Vente::where('statut', 'annulee')
+                ->where('updated_at', '>=', $hier)
+                ->where('employe_id', $ua->employe_id)
+                ->get();
+            
+            // Vérifier si certaines annulations sont sans motif ou avec motifs similaires
+            $sansMotif = $ventesAnnulees->filter(function ($vente) {
+                return empty($vente->notes);
+            })->count();
+            
+            $severite = $ua->nb_annulations >= 5 || $sansMotif > 0 ? 'haute' : 'moyenne';
+            
+            $anomalies[] = [
+                'type' => 'annulations_multiples',
+                'severite' => $severite,
+                'message' => "{$ua->nb_annulations} annulations par {$username} en 24h pour un total de " . number_format($ua->montant_total, 0, ',', ' ') . " FCFA",
+                'details' => [
+                    'employe_id' => $ua->employe_id,
+                    'username' => $username,
+                    'nb_annulations' => $ua->nb_annulations,
+                    'montant_total' => $ua->montant_total,
+                    'sans_motif' => $sansMotif,
+                    'ventes_ids' => $ventesAnnulees->pluck('id')->toArray()
+                ]
+            ];
+        }
+    }
+    
+    /**
+     * Détecte les ajustements de stock massifs (>20%)
+     * 
+     * @param array &$anomalies Tableau d'anomalies à compléter
+     */
+    private function detecterAjustementsStockMassifs(&$anomalies)
+    {
+        // Récupérer les ajustements de stock des dernières 24h
+        $hier = Carbon::now()->subDay();
+        
+        $ajustements = MouvementStock::where(function ($query) {
+            $query->where('type', 'ajustement_positif')
+                ->orWhere('type', 'ajustement_negatif');
+        })
+        ->where('created_at', '>=', $hier)
+        ->get();
+        
+        foreach ($ajustements as $ajustement) {
+            $produit = $ajustement->produit;
+            
+            // Calculer le pourcentage d'ajustement par rapport au stock
+            $stockAvant = $produit->stock - ($ajustement->type === 'ajustement_positif' ? $ajustement->quantite : -$ajustement->quantite);
+            
+            if ($stockAvant > 0) {
+                $pourcentageAjustement = abs($ajustement->quantite / $stockAvant * 100);
+                
+                if ($pourcentageAjustement > 20) {
+                    $anomalies[] = [
+                        'type' => 'ajustement_stock_massif',
+                        'severite' => 'moyenne',
+                        'message' => "Ajustement de stock important ({$pourcentageAjustement}%) pour le produit {$produit->nom}",
+                        'details' => [
+                            'produit_id' => $produit->id,
+                            'produit_nom' => $produit->nom,
+                            'stock_avant' => $stockAvant,
+                            'quantite_ajustee' => $ajustement->quantite,
+                            'pourcentage' => $pourcentageAjustement,
+                            'date_ajustement' => $ajustement->created_at,
+                            'utilisateur' => $ajustement->utilisateur->name
+                        ]
+                    ];
+                }
+            }
+        }
+    }
+    
+    /**
+     * Génère un rapport d'audit quotidien
+     * 
+     * @param Carbon $date Date du rapport (défaut: aujourd'hui)
+     * @return array Données du rapport
+     */
+    public function genererRapportQuotidien($date = null)
+    {
+        $date = $date ?? Carbon::now();
+        $debut = $date->copy()->startOfDay();
+        $fin = $date->copy()->endOfDay();
+        
+        // Récupération des activités de la journée
+        $activites = \App\Models\ActivityLog::whereBetween('created_at', [$debut, $fin])
+            ->orderBy('created_at', 'asc')
+            ->get();
+        
+        // Récupération des ventes de la journée
+        $ventes = Vente::whereBetween('date_vente', [$debut, $fin])->get();
+        $ventesAnnulees = $ventes->where('statut', 'annulé');
+        
+        // Récupération des paiements de la journée (avec gestion d'erreur si la table n'existe pas)
+        try {
+            // Vérifier si la table existe
+            if (Schema::hasTable('paiements')) {
+                $paiements = Paiement::whereBetween('date_paiement', [$debut, $fin])->get();
+                
+                // Calcul des montants par méthode de paiement
+                $montantsParMethode = $paiements->groupBy('methode')
+                    ->map(function ($items) {
+                        return [
+                            'count' => $items->count(),
+                            'total' => $items->sum('montant')
+                        ];
+                    });
+            } else {
+                $paiements = collect();
+                $montantsParMethode = collect();
+            }
+        } catch (\Exception $e) {
+            // Si une erreur se produit, utiliser des collections vides
+            $paiements = collect();
+            $montantsParMethode = collect();
+            
+            // Logger l'erreur
+            \Log::warning('Erreur lors de la récupération des paiements: ' . $e->getMessage());
+        }
+        
+        // Détection des anomalies
+        $anomalies = $this->detecterAnomalies();
+        
+        // Structure du rapport
+        $rapport = [
+            'date' => $date->format('Y-m-d'),
+            'periode' => [
+                'debut' => $debut->format('Y-m-d H:i:s'),
+                'fin' => $fin->format('Y-m-d H:i:s')
+            ],
+            'ventes' => [
+                'total' => $ventes->count(),
+                'montant_total' => $ventes->sum('montant_final'),
+                'panier_moyen' => $ventes->count() > 0 ? $ventes->sum('montant_final') / $ventes->count() : 0,
+                'annulees' => [
+                    'total' => $ventesAnnulees->count(),
+                    'montant_total' => $ventesAnnulees->sum('montant_final')
+                ]
+            ],
+            'paiements' => [
+                'total' => $paiements->count(),
+                'montant_total' => $paiements->sum('montant'),
+                'par_methode' => $montantsParMethode
+            ],
+            'activites' => [
+                'total' => $activites->count(),
+                'par_type' => $activites->groupBy('type')->map->count()
+            ],
+            'anomalies' => [
+                'total' => count($anomalies),
+                'par_severite' => collect($anomalies)->groupBy('severite')->map->count(),
+                'liste' => $anomalies
+            ]
+        ];
+        
+        return $rapport;
+    }
+    
+    /**
+     * Génère un rapport hebdomadaire d'audit
+     * 
+     * @param Carbon $dateDebut Date de début de la semaine
+     * @return array Données du rapport
+     */
+    public function genererRapportHebdomadaire($dateDebut = null)
+    {
+        $dateDebut = $dateDebut ?? Carbon::now()->startOfWeek();
+        $dateFin = $dateDebut->copy()->addDays(6);
+        
+        $rapportsQuotidiens = [];
+        $currentDate = $dateDebut->copy();
+        
+        // Générer les rapports quotidiens pour chaque jour de la semaine
+        while ($currentDate <= $dateFin) {
+            $rapportsQuotidiens[$currentDate->format('Y-m-d')] = $this->genererRapportQuotidien($currentDate);
+            $currentDate->addDay();
+        }
+        
+        // Agréger les données pour le rapport hebdomadaire
+        $ventesTotales = 0;
+        $montantTotal = 0;
+        $totalAnomalies = 0;
+        
+        foreach ($rapportsQuotidiens as $rapport) {
+            $ventesTotales += $rapport['ventes']['total'];
+            $montantTotal += $rapport['ventes']['montant_total'];
+            $totalAnomalies += $rapport['anomalies']['total'];
+        }
+        
+        $panierMoyen = $ventesTotales > 0 ? $montantTotal / $ventesTotales : 0;
+        
+        // Structure du rapport hebdomadaire
+        $rapportHebdomadaire = [
+            'periode' => [
+                'debut' => $dateDebut->format('Y-m-d'),
+                'fin' => $dateFin->format('Y-m-d')
+            ],
+            'resume' => [
+                'ventes_totales' => $ventesTotales,
+                'montant_total' => $montantTotal,
+                'panier_moyen' => $panierMoyen,
+                'anomalies_totales' => $totalAnomalies
+            ],
+            'tendances' => [
+                'ventes_par_jour' => collect($rapportsQuotidiens)->map(function ($rapport) {
+                    return [
+                        'date' => $rapport['date'],
+                        'total' => $rapport['ventes']['total'],
+                        'montant' => $rapport['ventes']['montant_total']
+                    ];
+                })->values()->toArray(),
+                'anomalies_par_jour' => collect($rapportsQuotidiens)->map(function ($rapport) {
+                    return [
+                        'date' => $rapport['date'],
+                        'total' => $rapport['anomalies']['total']
+                    ];
+                })->values()->toArray()
+            ],
+            'rapports_quotidiens' => $rapportsQuotidiens
+        ];
+        
+        return $rapportHebdomadaire;
+    }
+    
+    /**
+     * Envoie une notification pour une anomalie détectée
+     * 
+     * @param array $anomalie Données de l'anomalie
+     * @param array $destinataires Liste des emails des destinataires
+     */
+    public function notifierAnomalie($anomalie, $destinataires)
+    {
+        try {
+            // Dans une implémentation réelle, on enverrait un email ou une notification push
+            // Pour l'instant, on se contente de logger l'anomalie
+            if (Log::getLogger()->hasHandlers() && array_key_exists('audit', config('logging.channels'))) {
+                Log::channel('audit')->warning('ANOMALIE DETECTEE: ' . $anomalie['message'], $anomalie['details'] ?? []);
+            } else {
+                Log::warning('ANOMALIE DETECTEE: ' . $anomalie['message'], $anomalie['details'] ?? []);
+            }
+            
+            // Stockage de l'anomalie dans la base de données si possible
+            if (class_exists('\App\Models\Anomalie')) {
+                \App\Models\Anomalie::create([
+                    'type' => $anomalie['type'],
+                    'severite' => $anomalie['severite'],
+                    'message' => $anomalie['message'],
+                    'details' => json_encode($anomalie['details'] ?? []),
+                    'statut' => 'non_traitee'
+                ]);
+            }
+            
+            // Exemple d'envoi d'email (à décommenter et configurer)
+            /*
+            if (count($destinataires) > 0) {
+                Mail::send('emails.anomalie', ['anomalie' => $anomalie], function ($message) use ($destinataires, $anomalie) {
+                    $message->to($destinataires)
+                        ->subject('[ALERTE] ' . ucfirst($anomalie['severite']) . ' - ' . $anomalie['message']);
+                });
+            }
+            */
+            
+            // Alternative pour envoyer un email sans template dédié
+            /*
+            if (count($destinataires) > 0) {
+                $sujet = '[ALERTE] ' . ucfirst($anomalie['severite']) . ' - ' . $anomalie['message'];
+                $contenu = "Une anomalie a été détectée dans le système :\n\n";
+                $contenu .= "Type: {$anomalie['type']}\n";
+                $contenu .= "Sévérité: {$anomalie['severite']}\n";
+                $contenu .= "Message: {$anomalie['message']}\n\n";
+                
+                if (!empty($anomalie['details'])) {
+                    $contenu .= "Détails:\n";
+                    foreach ($anomalie['details'] as $key => $value) {
+                        $contenu .= "- {$key}: {$value}\n";
+                    }
+                }
+                
+                Mail::raw($contenu, function ($message) use ($destinataires, $sujet) {
+                    $message->to($destinataires)->subject($sujet);
+                });
+            }
+            */
+        } catch (\Exception $e) {
+            Log::error('Erreur lors de la notification d\'anomalie: ' . $e->getMessage());
+        }
+    }
+}

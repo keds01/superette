@@ -1,0 +1,399 @@
+CAHIER DES CHARGES RÉORGANISÉ - SYSTÈME DE GESTION POUR SUPERETTES TOGOLAISES
+Date : 10 mai 2025
+Cible : Petites supérettes 
+Objectif : Développer un système robuste et convivial pour la gestion des produits, stocks, ventes, audits, finances, rapports et administration, avec une interface claire et un taux de bugs minimal (<10%).
+________________________________________
+1. MODULE PRODUITS (Gestion des Produits)
+Aperçu
+Ce module permet de créer, catégoriser, gérer les prix et suivre les produits, y compris les denrées périssables, avec des alertes intelligentes pour les stocks faibles ou les dates de péremption. Il garantit des données produits précises et des notifications opportunes.
+Fonctionnalités Détaillées
+1.	Création de Produit : 
+
+o	Formulaire en 4 étapes : 
+
+	Identification : Nom, référence interne, code-barres (scan ou saisie manuelle), catégorie (arborescence à 3 niveaux, ex. Alimentaire > Céréales > Riz).
+	Conditionnement : Unité de vente (pièce, kg, litre) + conditionnement fournisseur (ex. carton de 12 unités).
+	Stocks : Quantité initiale, seuil d’alerte, emplacement (rayon, étagère).
+	Commercial : Prix d’achat HT, marge automatique, prix de vente TTC
+
+o	Validation des champs obligatoires pour éviter les erreurs.
+
+2.	Gestion des Stocks : 
+
+o	Conversion automatique : Ex. 3 cartons (12 unités/carton) + 5 unités = 41 unités totales.
+
+o	Alertes intelligentes : 
+	Niveau 1 (Jaune) : Stock = 1.5x seuil minimum.
+	Niveau 2 (Rouge) : Stock = seuil minimum.
+	Niveau 3 (Urgent) : Stock insuffisant pour ventes moyennes journalières.
+
+3.	Gestion des Périssables : 
+o	Enregistrement de la date de péremption.
+
+o	Alertes automatiques : 
+	15 jours avant : Notification dans l’interface.
+	5 jours avant : SMS au responsable + mise en avant en caisse (ex. suggestion de promotion).
+Parcours Utilisateur
+Scénario : Un gérant ajoute un nouveau produit (Riz Supermont 5kg).
+1.	Se connecte à l’interface (rôle : Gérant).
+
+2.	Accède au menu Produits > Ajouter Produit.
+
+3.	Remplit le formulaire : 
+o	Étape 1 : Saisit "Riz Supermont 5kg", référence "RZ-001", scanne le code-barres, sélectionne catégorie "Alimentaire > Céréales > Riz".
+o	Étape 2 : Indique unité de vente (sac de 5kg), conditionnement fournisseur (carton de 12 sacs).
+o	Étape 3 : Saisit stock initial (60 unités), seuil d’alerte (10 unités), emplacement (Rayon 3, Étagère B).
+o	Étape 4 : Saisit prix d’achat (25,000 XOF/carton), marge (14%), prix de vente calculé (28,500 XOF/carton).
+
+4.	Valide le formulaire ; le produit est créé et visible dans la liste des produits.
+
+5.	Reçoit une confirmation visuelle (toast : "Produit ajouté avec succès").
+Exemple Concret
+FICHE PRODUIT
+Nom : Riz Supermont 5kg
+Code-barres : 123456789012
+Catégorie : Alimentaire > Céréales > Riz
+Stock :
+- Cartons : 5 (12 unités/carton)
+- Unités : 3
+- Total : 63 unités
+- Seuil d’alerte : 10 unités
+Prix :
+- Achat : 25,000 XOF/carton
+- Vente : 28,500 XOF/carton (2,375 XOF/unité)
+Emplacement : Rayon 3, Étagère B
+Dernière livraison : 10/05/2025
+Notes Techniques
+•	Backend : Utiliser Laravel avec un modèle Product (Eloquent) pour gérer les produits. Stocker les catégories dans une table séparée avec relation belongsTo pour l’arborescence.
+
+•	Frontend : Formulaire multi-étapes avec Livewire pour une expérience fluide sans rechargement. Utiliser Tailwind CSS pour un design épuré (pas de "design bizarre").
+
+•	Validation : Validation côté serveur (Laravel) + client (Alpine.js) pour éviter les erreurs de saisie (ex. code-barres unique).
+
+•	Alertes : Planifier des tâches (Laravel Scheduler) pour vérifier les stocks et péremptions quotidiennement. Intégrer Twilio pour les SMS.
+
+•	Tests : Écrire des tests unitaires (PHPUnit) pour la conversion de stock et les alertes. Tester les formulaires avec Dusk pour l’UI.
+
+•	Bug Minimization : Utiliser des migrations précises, des contraintes d’unicité (code-barres), et des try-catch pour les opérations critiques.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Création produit	✅	✅ (sa boutique)	❌
+Modification produit	✅	✅ (sa boutique)	❌
+Suppression produit	✅	❌	❌
+Consultation produit	✅	✅	✅
+________________________________________
+2. MODULE CAISSE (Point de Vente)
+Aperçu
+Gère les ventes en caisse avec une interface tactile optimisée, prend en charge plusieurs modes de paiement, et applique des remises/promotions. Simplifie le processus de vente pour les caissiers tout en assurant la traçabilité.
+
+Fonctionnalités Détaillées
+1.	Processus de Vente : 
+
+o	Interface tactile avec : 
+
+	Zone de scan centrale (code-barres).
+	Recherche vocale/textuelle pour produits.
+	Suggestions de produits fréquents.
+
+o	Gestion des quantités : 
+
+	Modification directe (ex. +2 unités).
+	Option "Annuler dernier article".
+	Calcul automatique des totaux (HT, TTC).
+
+2.	Paiements : 
+
+o	Espèces : Saisie du montant reçu, calcul de la monnaie rendue, option "Arrondi" pour dons.
+o	Mobile Money : Génération de QR Code, validation automatique via API.
+o	Tickets : En-tête personnalisable, mentions légales, duplicata automatique.
+
+3.	Remises : 
+
+o	Remises manuelles (avec justification, max 10% sans gérant).
+o	Promotions automatiques : Ex. "3 pour 2", réduction %, prix spécial période.
+Parcours Utilisateur
+Scénario : Un caissier effectue une vente pour un client.
+1.	Ouvre la caisse (saisit le fond de caisse, ex. 50,000 XOF).
+2.	Accède à l’interface de vente (écran tactile).
+3.	Scanne le code-barres du produit (ex. Riz Supermont 5kg) ou recherche "Riz" via texte.
+4.	Ajuste la quantité (ex. 2 sacs).
+5.	Applique une promotion automatique (ex. 5% sur catégorie Céréales) (Si il doit y avoir une promotion le gérant seul pourra applique cela depuis son Dashboard dans la partie réservée au promotion il pourra donner la main au responsable pour le faire aussi). 
+6.	Sélectionne le mode de paiement (Mobile Money).
+7.	Génère un QR Code, client scanne, transaction validée.
+8.	Imprime le ticket avec en-tête, détails, et mentions légales.
+9.	Valide la vente ; stock mis à jour en temps réel.
+Exemple Concret
+TICKET DE CAISSE - 10/05/2025
+Supérette Lomé
+Article : Riz Supermont 5kg
+Quantité : 2
+Prix unitaire : 2,375 XOF
+Promotion : -5% (Céréales)
+Total : 4,512 XOF
+Paiement : Mobile Money
+Transaction : #4587
+Notes Techniques
+•	Backend : Modèle Sale pour enregistrer les ventes, avec relations vers Product et User. Utiliser des transactions DB pour assurer la cohérence (stock, paiement).
+•	Frontend : Interface tactile avec Livewire pour des mises à jour en temps réel. Utiliser un scanner de code-barres via API JavaScript (QuaggaJS).
+•	Paiements : Intégrer une API Mobile Money (ex. MTN MoMo) pour valider les transactions. Stocker les justificatifs de remise dans une table Discount.
+•	Tests : Tests unitaires pour les calculs (TVA, monnaie rendue). Tests d’intégration pour le flux de vente complet.
+•	Bug Minimization : Utiliser des composants Livewire isolés pour chaque section (scan, paiement). Valider les entrées (ex. quantité positive) côté client/serveur.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Vente standard	✅	✅	✅
+Annulation article	✅	✅ (<10,000 XOF)	❌
+Remise manuelle	✅	✅ ou ❌	❌
+Consultation tickets	✅	✅ (sa boutique)	❌
+________________________________________
+3. MODULE STOCK (Gestion des Stocks)
+Aperçu
+Permet un suivi précis des stocks, des inventaires physiques, des transferts entre boutiques et des relations fournisseurs. Optimise la gestion pour éviter les ruptures ou pertes.
+Fonctionnalités Détaillées
+1.	Inventaire Physique : 
+
+o	Outils : 
+	Mode rapide : Scan continu des produits.
+	Mode précis : Fiche par produit avec saisie manuelle.
+	Marquage des produits comptés.
+
+o	Rapport d’écarts : Produits manquants/excédentaires, pertes financières.
+
+2.	Transferts Inter-Boutiques : 
+
+o	Processus en 5 étapes : 
+1.	Initiation (sélection produits).
+2.	Validation par gérant.
+3.	Préparation (bon de transfert).
+4.	Réception (contrôle qualité).
+5.	Mise à jour des stocks.
+
+3.	Gestion des Fournisseurs : 
+
+o	Fiche : Contacts, conditions (délais, paiement), historique.
+o	Notation : Respect des délais, qualité des produits.
+Parcours Utilisateur
+Scénario : Un responsable effectue un inventaire partiel.
+1.	Accède à Stocks > Inventaire.
+2.	Sélectionne le mode rapide (scan continu).
+3.	Scanne les produits dans Rayon 3 (ex. Riz Supermont, Lait Dano).
+4.	Saisit manuellement pour un produit non scannable (ex. 10 unités de sucre).
+5.	Valide l’inventaire ; système compare avec stock théorique.
+6.	Reçoit un rapport d’écarts (ex. 2 unités de Riz manquantes).
+7.	Soumet le rapport au gérant pour validation.
+Exemple Concret
+RAPPORT D’INVENTAIRE - 10/05/2025
+Boutique : Lomé
+Produit : Riz Supermont 5kg
+Stock théorique : 63 unités
+Stock réel : 61 unités
+Écart : -2 unités (4,750 XOF)
+Action : Vérifier pertes/vol
+Notes Techniques
+•	Backend : Modèle Inventory pour les inventaires, Transfer pour les transferts. Utiliser des relations pour lier fournisseurs et produits.
+•	Frontend : Table interactive avec DataTables pour afficher les stocks. Formulaire Livewire pour les transferts.
+•	Tests : Tests unitaires pour les écarts d’inventaire. Tests d’intégration pour le flux de transfert.
+•	Bug Minimization : Verrouiller les transferts non validés par le gérant. Utiliser des indexes DB pour les recherches de stock.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Inventaire	✅	✅ (sa boutique)	❌
+Transferts	✅	✅ (sortants)	❌
+Gestion fournisseurs	✅	✅ (consultation)	❌
+________________________________________
+4. MODULE AUDIT (Traçabilité)
+Aperçu
+Assure une traçabilité complète des actions (connexions, modifications, ventes) avec détection des anomalies et rapports détaillés. Renforce la sécurité et la transparence.
+Fonctionnalités Détaillées
+1.	Journal des Activités : 
+
+o	Enregistre : Connexions, modifications de prix, annulations, ajustements de stock.
+o	Filtres : Date, utilisateur, boutique, type d’opération.
+o	Export : PDF, Excel, CSV.
+
+2.	Détection d’Anomalies :
+ 
+o	Règles : 
+	Variations de prix >10% en 24h.
+	Séries d’annulations suspectes.
+	Ajustements de stock massifs (>20%).
+
+o	Notifications : Interface (toasts), e-mail/SMS au gérant.
+
+3.	Rapports : 
+o	Quotidien : Résumé des événements.
+o	Hebdomadaire : Tendances.
+o	Personnalisable : Période, boutique.
+Parcours Utilisateur
+Scénario : Un gérant consulte un rapport d’audit.
+1.	Accède à Audit > Journal des Activités.
+2.	Filtre par date (10/05/2025) et utilisateur (CAISSIER-02).
+3.	Voit une liste d’actions (ex. 3 annulations de ventes).
+4.	Reçoit une alerte pour une série d’annulations suspectes.
+5.	Exporte un rapport PDF pour analyse.
+Exemple Concret
+text
+Copier
+JOURNAL DES ACTIVITÉS - 10/05/2025
+[14:30] CAISSIER-02 : Vente #4587 (28,500 XOF)
+[14:32] CAISSIER-02 : Annulation #4587 (motif non saisi)
+[15:00] GÉRANT : Modification prix (Lait Dano : 1,200 → 1,350 XOF)
+ALERTE : 3 annulations par CAISSIER-02 en 1h
+Notes Techniques
+•	Backend : Modèle ActivityLog avec polymorphic relations pour lier actions à différentes entités. Utiliser Laravel Auditing pour simplifier.
+•	Frontend : Table avec DataTables pour les logs. Graphiques avec Chart.js pour les tendances.
+•	Tests : Tests pour les règles d’anomalies. Tests d’intégration pour les exports.
+•	Bug Minimization : Stocker les logs dans une table dédiée avec indexation pour performances.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Consultation logs	✅	✅ (sa boutique)	❌
+Export rapports	✅	✅ (PDF)	❌
+Alertes anomalies	✅	✅	❌
+________________________________________
+5. MODULE AUDIT FINANCIER
+Aperçu
+Surveille les flux financiers, analyse les marges et audite les fournisseurs pour détecter les écarts ou fraudes. Offre une transparence totale sur les finances.
+Fonctionnalités Détaillées
+1.	Contrôle des Flux Financiers : 
+o	Rapprochement : Caisse théorique vs réelle, Mobile Money déclaré vs reçu.
+o	Alertes : Écarts >1% du CA, remises suspectes.
+2.	Analyse des Marges : 
+o	Calcul par produit, catégorie, période.
+o	Détection : Marges négatives, baisses soudaines.
+3.	Audit des Fournisseurs : 
+o	Analyse : Évolution des prix, retards, qualité.
+o	Notation : Score de 1 à 5.
+Parcours Utilisateur
+Scénario : Un gérant vérifie les flux financiers.
+1.	Accède à Audit Financier > Rapport Quotidien.
+2.	Voit un écart de caisse (2,500 XOF).
+3.	Reçoit une alerte pour 3 annulations suspectes.
+4.	Consulte l’analyse des marges (ex. Riz Supermont : 14%).
+5.	Exporte un rapport pour le comptable.
+Exemple Concret
+RAPPORT FINANCIER - 10/05/2025
+CA : 1,450,000 XOF
+Écart caisse : 2,500 XOF (0.17%)
+Mobile Money : 250,000 XOF (validé)
+Alertes : 3 annulations par CAISSIER-02
+Marge moyenne : 12% (Riz Supermont : 14%)
+Notes Techniques
+•	Backend : Modèle FinancialAudit pour les rapports. Utiliser des jobs Laravel pour le rapprochement automatique.
+•	Frontend : Tableau de bord avec ApexCharts pour les marges.
+•	Tests : Tests pour les calculs de marges et écarts.
+•	Bug Minimization : Automatiser les rapprochements à minuit via Scheduler.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Audit financier	✅	❌	❌
+Consultation rapports	✅	❌	❌
+________________________________________
+6. MODULE REPORTING (Rapports)
+Aperçu
+Fournit des tableaux de bord et analyses commerciales pour suivre les performances (CA, paniers, produits). Offre des exports personnalisables.
+Fonctionnalités Détaillées
+1.	Tableaux de Bord : 
+o	Vues : Globale, par boutique, catégorie, caissier.
+o	Indicateurs : CA, panier moyen, rotation.
+2.	Analyse Commerciale : 
+o	Top 10 : Produits vendus, rentables, clients fidèles.
+o	Courbes : Ventes, saisonnalité.
+3.	Exports : 
+o	Formats : PDF, Excel, CSV.
+o	Options : Période, détail, filtres.
+Parcours Utilisateur
+Scénario : Un gérant analyse les ventes.
+1.	Accède à Reporting > Tableau de Bord.
+2.	Sélectionne la vue "Par boutique" (Lomé).
+3.	Voit le CA (1,450,000 XOF) et le top produit (Riz Supermont).
+4.	Exporte un rapport Excel pour la période (01/05-10/05).
+Exemple Concret
+TABLEAU DE BORD - 10/05/2025
+CA : 1,450,000 XOF
+Panier moyen : 5,800 XOF
+Top produit : Riz Supermont (120 unités vendues)
+Notes Techniques
+•	Backend : Modèle Report avec requêtes optimisées (Eloquent).
+•	Frontend : Graphiques interactifs avec Chart.js.
+•	Tests : Tests pour les calculs de CA et exports.
+•	Bug Minimization : Cacher les données sensibles selon les rôles.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Tableaux de bord	✅	✅ (sa boutique)	❌
+Exports	✅	✅ (sa boutique)	❌
+________________________________________
+7. MODULE ADMINISTRATION (Configuration)
+Aperçu
+Gère les utilisateurs, paramètres système et sauvegardes. Assure une configuration sécurisée et flexible.
+Fonctionnalités Détaillées
+1.	Gestion des Utilisateurs : 
+o	Profils : Gérant, Responsable, Caissier, Comptable.
+o	Paramètres : Boutiques, horaires, permissions.
+2.	Paramétrage : 
+o	Devise : XOF (verrouillé).
+o	Seuils : Alertes stock, limites financières.
+3.	Sauvegardes : 
+o	Quotidienne (incrémentielle), hebdomadaire (complète), mensuelle (archivage).
+o	Vérification d’intégrité, restauration guidée.
+Parcours Utilisateur
+Scénario : Un gérant crée un profil caissier.
+1.	Accède à Administration > Utilisateurs.
+2.	Clique sur "Ajouter Utilisateur".
+3.	Saisit nom, rôle (Caissier), boutique (Lomé), permissions.
+4.	Valide ; le caissier reçoit un e-mail avec identifiants.
+Exemple Concret
+UTILISATEUR
+Nom : Kofi Amadou
+Rôle : Caissier
+Boutique : Lomé
+Permissions : Ventes, consultation produits
+Notes Techniques
+•	Backend : Modèle User avec Spatie Permission pour les rôles.
+•	Frontend : Formulaire simple avec Livewire.
+•	Tests : Tests pour les permissions et sauvegardes.
+•	Bug Minimization : Restreindre l’accès via middleware Laravel.
+Droits d’Accès
+Fonctionnalité	Gérant	Responsable	Caissier
+Gestion utilisateurs	✅	❌	❌
+Paramétrage	✅	❌	❌
+Sauvegardes	✅	❌	❌
+________________________________________
+8. WORKFLOWS COMPLETS
+8.1 Vente
+1.	Ouverture caisse (fond de caisse).
+2.	Scan/recherche produits.
+3.	Ajustement quantités.
+4.	Application promotions.
+5.	Paiement (espèces/Mobile Money).
+6.	Impression ticket.
+7.	Mise à jour stock.
+8.	Enregistrement vente.
+8.2 Rupture de Stock
+1.	Alerte seuil atteint.
+2.	Vérification stocks autres boutiques.
+3.	Proposition transfert.
+4.	Validation gérant.
+5.	Préparation/réception.
+6.	Mise à jour stock.
+8.3 Audit Financier
+1.	Génération rapport (minuit).
+2.	Contrôle encaissements.
+3.	Vérification écarts.
+4.	Analyse marges.
+5.	Notification gérant.
+________________________________________
+9. LIVRABLES
+1.	Application Web : Responsive, base de données optimisée, API.
+2.	Documentation : Manuel utilisateur, guide admin, fiches procédures.
+3.	Formation : Gérants (1j), Responsables (1j), Caissiers (0.5j), Comptables (1j).
+4.	Support : 3 mois, corrections prioritaires, assistance téléphonique.
+________________________________________
+10. SPÉCIFICATIONS TECHNIQUES
+1.	Configuration Requise : 
+o	Serveur : 4 CPU, 8GB RAM, 200GB SSD.
+o	Clients : Navigateurs récents, 1280x720, internet stable.
+2.	Sécurité : AES-256, authentification forte, logs, sauvegardes chiffrées.
+3.	Performance : Réponse <1s, 50 utilisateurs simultanés, rapports <30s.
+________________________________________
+11. STACK TECHNIQUE
+•	Backend : Laravel 11, MySQL, Laravel Livewire, Sanctum.
+•	Frontend : Tailwind CSS, Alpine.js, Chart.js, DataTables.
+•	Outils : Laravel Scheduler (alertes), Twilio (SMS), Pusher (notifications).
+
