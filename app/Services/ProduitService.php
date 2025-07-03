@@ -22,21 +22,25 @@ class ProduitService
         try {
             DB::beginTransaction();
             
-            // Utilisation des valeurs pré-calculées si présentes, sinon calcul
-            if (isset($data['prix_vente_ht']) && isset($data['prix_vente_ttc'])) {
-                $prix_vente_ht = (float) $data['prix_vente_ht'];
-                $prix_vente_ttc = (float) $data['prix_vente_ttc'];
-            } else {
-                // Calcul des prix via la méthode dédiée
-                $calculated = $this->calculatePrices(
-                    (float) $data['prix_achat_ht'], 
-                    (float) $data['marge'], 
-                    (float) $data['tva']
-                );
-                $prix_vente_ht = $calculated['prix_vente_ht'];
-                $prix_vente_ttc = $calculated['prix_vente_ttc'];
-            }
+            \Log::info('[DEBUG STOCK] Payload reçu pour création', [
+                'stock_initial' => $data['stock_initial'] ?? null,
+                'stock_transmis' => $data['stock'] ?? null,
+                'data' => $data
+            ]);
+            
+            // Utiliser directement les valeurs envoyées sans calcul automatique
+            $prix_vente_ht = isset($data['prix_vente_ht']) ? (float) $data['prix_vente_ht'] : 0;
+            $prix_vente_ttc = isset($data['prix_vente_ttc']) ? (float) $data['prix_vente_ttc'] : 0;
 
+            // Récupérer la superette active depuis les données ou la session
+            $superetteId = $data['superette_id'] ?? session('active_superette_id');
+            
+            // Si aucune superette n'est définie, générer une erreur
+            if (!$superetteId) {
+                \Log::warning('Création de produit sans superette active. Vérifiez que vous avez sélectionné une superette.');
+                throw new \Exception('Aucune superette active. Veuillez sélectionner une superette avant de créer un produit.');
+            }
+            
             // Création du produit avec données de base
             $produitData = [
                 'nom' => $data['nom'],
@@ -47,21 +51,54 @@ class ProduitService
                 'unite_vente_id' => (int) $data['unite_vente_id'],
                 'conditionnement_fournisseur' => $data['conditionnement_fournisseur'],
                 'quantite_par_conditionnement' => (float) ($data['quantite_par_conditionnement'] ?? 1),
-                'stock' => (float) ($data['stock_initial'] ?? 0),
+                'stock' => (float) ($data['stock'] ?? 0),
                 'seuil_alerte' => (float) $data['seuil_alerte'],
-                'emplacement_rayon' => $data['emplacement_rayon'],
-                'emplacement_etagere' => $data['emplacement_etagere'],
+                'emplacement_rayon' => $data['emplacement_rayon'] ?? null,
+                'emplacement_etagere' => $data['emplacement_etagere'] ?? null,
                 'date_peremption' => $data['date_peremption'] ?? null,
                 'prix_achat_ht' => (float) $data['prix_achat_ht'],
-                'prix_vente_ht' => round($prix_vente_ht, 2),
-                'prix_vente_ttc' => round($prix_vente_ttc, 2),
+                'prix_vente_ht' => $prix_vente_ht,
+                'prix_vente_ttc' => $prix_vente_ttc,
                 'marge' => (float) $data['marge'],
                 'tva' => (float) $data['tva'],
-                'actif' => true
+                'actif' => true,
+                'superette_id' => $superetteId // Assignation explicite de la superette
             ];
             
             $produit = Produit::create($produitData);
-            Log::info('Produit créé avec succès', ['id' => $produit->id, 'nom' => $produit->nom]);
+            \Log::info('[DEBUG STOCK] Produit créé', [
+                'id' => $produit->id,
+                'nom' => $produit->nom,
+                'stock_enregistre' => $produit->stock,
+                'superette_id' => $produit->superette_id
+            ]);
+
+            // Gestion des conditionnements
+            if (isset($data['conditionnements']) && is_array($data['conditionnements'])) {
+                \Log::info('Création des conditionnements pour le produit', [
+                    'produit_id' => $produit->id,
+                    'conditionnements' => $data['conditionnements']
+                ]);
+                
+                foreach ($data['conditionnements'] as $cond) {
+                    $produit->conditionnements()->create([
+                        'type' => $cond['type'],
+                        'quantite' => $cond['quantite'],
+                        'prix' => $cond['prix'],
+                    ]);
+                }
+                
+                // Vérification que les conditionnements ont bien été créés
+                $conditionsCount = $produit->conditionnements()->count();
+                \Log::info('Conditionnements créés', [
+                    'count' => $conditionsCount,
+                    'conditionnements' => $produit->conditionnements()->get()
+                ]);
+            } else {
+                \Log::warning('Aucun conditionnement fourni pour le produit', [
+                    'produit_id' => $produit->id
+                ]);
+            }
 
             // Traitement de l'image avec gestion d'erreurs
             if (isset($data['image']) && !empty($data['image'])) {
@@ -69,10 +106,10 @@ class ProduitService
             }
 
             // Création du mouvement de stock initial (si stock > 0)
-            if ((float)($data['stock_initial'] ?? 0) > 0) {
+            if ((float)($data['stock'] ?? 0) > 0) {
                 $this->createStockMovement($produit, [
                     'type' => 'entree',
-                    'quantite' => (float) $data['stock_initial'],
+                    'quantite' => (float) $data['stock'],
                     'prix_unitaire' => (float) $data['prix_achat_ht'],
                     'motif' => 'Stock initial',
                     'date_peremption' => $data['date_peremption'] ?? null
@@ -103,22 +140,76 @@ class ProduitService
         try {
             DB::beginTransaction();
             
-            // Recalcul des prix si nécessaire
-            if (isset($data['prix_achat_ht']) || isset($data['marge']) || isset($data['tva'])) {
-                $prix_achat_ht = $data['prix_achat_ht'] ?? $produit->prix_achat_ht;
-                $marge = $data['marge'] ?? $produit->marge;
-                $tva = $data['tva'] ?? $produit->tva;
-                
-                // Utiliser les valeurs calculées si présentes
-                if (!isset($data['prix_vente_ht']) || !isset($data['prix_vente_ttc'])) {
-                    $calculated = $this->calculatePrices((float) $prix_achat_ht, (float) $marge, (float) $tva);
-                    $data['prix_vente_ht'] = $calculated['prix_vente_ht'];
-                    $data['prix_vente_ttc'] = $calculated['prix_vente_ttc'];
-                }
+            // Utiliser directement les valeurs envoyées sans calcul automatique
+            if (isset($data['prix_vente_ht'])) {
+                $data['prix_vente_ht'] = (float) $data['prix_vente_ht'];
+            }
+            if (isset($data['prix_vente_ttc'])) {
+                $data['prix_vente_ttc'] = (float) $data['prix_vente_ttc'];
             }
 
             // Mise à jour du produit
             $produit->update($data);
+
+            // Mise à jour des conditionnements
+            if (isset($data['conditionnements']) && is_array($data['conditionnements'])) {
+                \Log::info('Mise à jour des conditionnements pour le produit', [
+                    'produit_id' => $produit->id,
+                    'conditionnements' => $data['conditionnements']
+                ]);
+                
+                $ids = [];
+                foreach ($data['conditionnements'] as $cond) {
+                    // Ignorer les entrées vides
+                    if (empty($cond['type']) || empty($cond['quantite'])) {
+                        continue;
+                    }
+                    
+                    // Convertir les valeurs en types appropriés
+                    $condData = [
+                        'type' => $cond['type'],
+                        'quantite' => (int)$cond['quantite'],
+                        'prix' => (float)$cond['prix']
+                    ];
+                    
+                    // Si un ID est fourni, utiliser updateOrCreate avec cet ID
+                    if (!empty($cond['id'])) {
+                        $c = $produit->conditionnements()->updateOrCreate(
+                            ['id' => $cond['id']],
+                            $condData
+                        );
+                    } else {
+                        // Sinon, créer un nouveau conditionnement
+                        $c = $produit->conditionnements()->create($condData);
+                    }
+                    
+                    $ids[] = $c->id;
+                    
+                    \Log::debug('Conditionnement mis à jour/créé', [
+                        'id' => $c->id,
+                        'type' => $c->type,
+                        'quantite' => $c->quantite,
+                        'prix' => $c->prix
+                    ]);
+                }
+                
+                // Supprimer les conditionnements non présents dans la requête
+                if (!empty($ids)) {
+                    $deleted = $produit->conditionnements()->whereNotIn('id', $ids)->delete();
+                    \Log::info('Conditionnements supprimés', ['count' => $deleted]);
+                }
+                
+                // Vérification que les conditionnements ont bien été mis à jour
+                $conditionsCount = $produit->conditionnements()->count();
+                \Log::info('Conditionnements mis à jour', [
+                    'count' => $conditionsCount,
+                    'conditionnements' => $produit->conditionnements()->get()
+                ]);
+            } else {
+                \Log::warning('Aucun conditionnement fourni pour la mise à jour du produit', [
+                    'produit_id' => $produit->id
+                ]);
+            }
 
             // Gestion optimisée de l'image
             if (isset($data['image']) && !empty($data['image'])) {
@@ -145,6 +236,10 @@ class ProduitService
 
     public function createStockMovement(Produit $produit, array $data)
     {
+        $superetteId = $produit->superette_id ?? session('active_superette_id') ?? (auth()->check() ? auth()->user()->superette_id : null);
+        if (!$superetteId) {
+            $superetteId = 1; // fallback ultime
+        }
         return MouvementStock::create([
             'produit_id' => $produit->id,
             'type' => $data['type'],
@@ -153,17 +248,37 @@ class ProduitService
             'date_mouvement' => $data['date_mouvement'] ?? now(),
             'motif' => $data['motif'],
             'date_peremption' => $data['date_peremption'] ?? null,
-            'user_id' => auth()->id()
+            'user_id' => auth()->id(),
+            'superette_id' => $superetteId
         ]);
     }
 
     public function createStockAlert(Produit $produit)
     {
+        // Récupérer la superette_id du produit
+        $superetteId = $produit->superette_id;
+        
+        // Si le produit n'a pas de superette_id, utiliser celle de la session
+        if (!$superetteId) {
+            $superetteId = session('active_superette_id');
+        }
+        
+        // Si toujours pas de superette_id, utiliser celle de l'utilisateur connecté
+        if (!$superetteId && auth()->check() && auth()->user()->superette_id) {
+            $superetteId = auth()->user()->superette_id;
+        }
+        
+        // Si toujours pas de superette_id, utiliser la superette par défaut (ID 1)
+        if (!$superetteId) {
+            $superetteId = 1; // Superette par défaut
+        }
+        
         return \App\Models\Alerte::create([
             'type' => 'stock_bas',
             'produit_id' => $produit->id,
             'message' => "Stock bas pour le produit {$produit->nom}",
-            'seuil' => $produit->seuil_alerte
+            'seuil' => $produit->seuil_alerte,
+            'superette_id' => $superetteId
         ]);
     }
 

@@ -6,7 +6,7 @@
 <div class="container-fluid py-4">
     <div class="glass-card mb-4">
         <h2 class="section-title">
-            <i class="fas fa-user-tag"></i> Modifier le rôle: {{ $role->nom }}
+            <i class="fas fa-user-tag"></i> Modifier le rôle: {{ $role->name }}
             <i class="fas fa-info-circle tooltip-icon" data-bs-toggle="tooltip" title="Modifiez les informations et les permissions de ce rôle"></i>
         </h2>
 
@@ -17,7 +17,7 @@
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label for="nom" class="form-label">Nom du rôle</label>
-                    <input type="text" class="form-control" id="nom" name="nom" value="{{ $role->nom }}" required>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ $role->name }}" required>
                 </div>
                 <div class="col-md-6">
                     <label for="description" class="form-label">Description</label>

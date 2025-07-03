@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\HasSuperette;
 
 class MouvementStock extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSuperette;
 
     protected $table = 'mouvements_stock';
 
@@ -24,7 +25,8 @@ class MouvementStock extends Model
         'type_reference',
         'motif',
         'user_id',
-        'date_mouvement'
+        'date_mouvement',
+        'superette_id'
     ];
 
     protected $casts = [
@@ -38,7 +40,7 @@ class MouvementStock extends Model
 
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class, 'produit_id');
+        return $this->belongsTo(Produit::class, 'produit_id')->withTrashed();
     }
 
     public function utilisateur(): BelongsTo

@@ -23,7 +23,7 @@
 
         <!-- Formulaire glassmorphique -->
         <div class="relative bg-white/60 backdrop-blur-xl border border-indigo-100 rounded-2xl shadow-2xl p-8">
-            <form action="{{ route('users.store') }}" method="POST" class="space-y-8">
+            <form action="{{ route('users.store') }}" method="POST" class="space-y-8" autocomplete="off">
                 @csrf
 
                 <!-- Informations principales -->
@@ -44,10 +44,10 @@
 
                         <div>
                             <label for="email" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">
-                                Email <span class="text-red-500">*</span>
-                                <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="L'adresse email de l'utilisateur"></i>
+                                Email
+                                <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="L'adresse email de l'utilisateur (optionnel)"></i>
                             </label>
-                            <input type="email" id="email" name="email" value="{{ old('email') }}" required
+                            <input type="email" id="email" name="email" value="{{ old('email') }}" autocomplete="off"
                                    class="mt-1 block w-full rounded-lg border border-indigo-200 bg-white/70 shadow focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
                             @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -91,7 +91,7 @@
                             <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="Le mot de passe doit contenir au moins 8 caractères"></i>
                         </label>
                         <div class="relative">
-                            <input type="password" id="password" name="password" required
+                            <input type="password" id="password" name="password" required autocomplete="new-password"
                                    class="mt-1 block w-full rounded-lg border border-indigo-200 bg-white/70 shadow focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all pr-10">
                             <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center toggle-password"
                                     onclick="togglePassword('password')">
@@ -109,7 +109,7 @@
                             <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="Confirmez le mot de passe"></i>
                         </label>
                         <div class="relative">
-                            <input type="password" id="password_confirmation" name="password_confirmation" required
+                            <input type="password" id="password_confirmation" name="password_confirmation" required autocomplete="new-password"
                                    class="mt-1 block w-full rounded-lg border border-indigo-200 bg-white/70 shadow focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all pr-10">
                             <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center toggle-password"
                                     onclick="togglePassword('password_confirmation')">
@@ -131,24 +131,38 @@
 
                 <!-- Rôles -->
                 <div class="space-y-4">
-                    <label class="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
-                        Rôles
-                        <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="Sélectionnez les rôles de l'utilisateur"></i>
-                    </label>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        @foreach($roles as $role)
-                        <div class="relative flex items-start">
-                            <div class="flex items-center h-5">
-                                <input type="checkbox" id="role-{{ $role->id }}" name="roles[]" value="{{ $role->id }}"
-                                       class="h-4 w-4 text-indigo-600 border-indigo-300 rounded focus:ring-indigo-500">
-                            </div>
-                            <div class="ml-3 text-sm">
-                                <label for="role-{{ $role->id }}" class="font-medium text-indigo-700">{{ $role->nom }}</label>
-                                <p class="text-gray-500">{{ $role->description }}</p>
-                            </div>
-                        </div>
-                        @endforeach
+                    <!-- Sélection de la superette -->
+                    <div class="mb-6">
+                        <label for="superette_id" class="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                            Superette <span id="superette_required" class="text-red-500">*</span>
+                            <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="Sélectionnez la superette à laquelle cet utilisateur sera rattaché"></i>
+                        </label>
+                        <select id="superette_id" name="superette_id" class="mt-1 block w-full rounded-lg border border-indigo-200 bg-white/70 shadow focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            <option value="">Aucune (Super Admin uniquement)</option>
+                            @foreach(\App\Models\Superette::orderBy('nom')->get() as $superette)
+                                <option value="{{ $superette->id }}" {{ old('superette_id') == $superette->id ? 'selected' : '' }}>
+                                    {{ $superette->nom }} ({{ $superette->code }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">Laisser vide uniquement pour les Super Administrateurs. Les utilisateurs standards doivent être affectés à une superette.</p>
+                        @error('superette_id')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
+
+                    <label for="role" class="block text-sm font-medium text-indigo-700 mb-2 flex items-center gap-1">
+                        Rôle <span class="text-red-500">*</span>
+                        <i class="fas fa-info-circle text-indigo-400" data-bs-toggle="tooltip" title="Sélectionnez le rôle de l'utilisateur"></i>
+                    </label>
+                    <select id="role" name="role" class="mt-1 block w-full rounded-lg border border-indigo-200 bg-white/70 shadow focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                        @foreach($roles as $value => $label)
+                            <option value="{{ $value }}" {{ old('role') == $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('role')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Actions -->
@@ -175,6 +189,31 @@
         tooltips.forEach(tooltip => {
             new bootstrap.Tooltip(tooltip);
         });
+        
+        // Gestion de la sélection de superette en fonction du rôle
+        const roleSelect = document.getElementById('role');
+        const superetteSelect = document.getElementById('superette_id');
+        const superetteRequired = document.getElementById('superette_required');
+        
+        function updateSuperetteRequirement() {
+            const isSuperAdmin = roleSelect.value === '{{ \App\Models\User::ROLE_SUPER_ADMIN }}';
+            
+            // Mise à jour de l'indicateur visuel d'obligation
+            superetteRequired.style.display = isSuperAdmin ? 'none' : 'inline';
+            
+            // Mise à jour de l'attribut required
+            if (isSuperAdmin) {
+                superetteSelect.removeAttribute('required');
+            } else {
+                superetteSelect.setAttribute('required', 'required');
+            }
+        }
+        
+        // Exécuter au chargement de la page
+        updateSuperetteRequirement();
+        
+        // Ajouter l'écouteur d'événements pour les changements futurs
+        roleSelect.addEventListener('change', updateSuperetteRequirement);
     });
 
     // Fonction pour basculer la visibilité du mot de passe

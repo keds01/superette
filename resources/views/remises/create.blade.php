@@ -15,32 +15,51 @@
                     </a>
                 </div>
             </div>
+            
+            @if ($errors->any())
+                <div class="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow animate-fade-in" role="alert">
+                    <div class="flex items-center mb-2">
+                        <i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>
+                        <span class="font-bold">Erreur(s) :</span>
+                    </div>
+                    <ul class="list-disc pl-6 text-sm">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+            @if(session('error'))
+                <div class="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow animate-fade-in" role="alert">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2 text-red-500"></i>
+                        <span class="font-medium">{{ session('error') }}</span>
+                    </div>
+                </div>
+            @endif
+            
+            @if(isset($vente))
+                @include('remises.form', ['vente' => $vente])
+            @else
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                Aucune vente sélectionnée. Vous allez être redirigé vers la sélection de vente...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    setTimeout(function() {
+                        window.location.href = "{{ route('remises.select-vente') }}";
+                    }, 1500);
+                </script>
+            @endif
         </div>
     </div>
-
-    <script>
-        // Mise à jour du label de la valeur selon le type
-        document.addEventListener('DOMContentLoaded', function() {
-            const typeRemise = document.getElementById('type_remise');
-            if (typeRemise) {
-                typeRemise.addEventListener('change', function() {
-                    const valeurLabel = document.getElementById('valeurLabel');
-                    const valeurInput = document.getElementById('valeur_remise');
-                    
-                    if (this.value === 'pourcentage') {
-                        valeurLabel.textContent = '(en %)';
-                        valeurInput.step = '0.01';
-                        valeurInput.max = '100';
-                    } else {
-                        valeurLabel.textContent = '(en FCFA)';
-                        valeurInput.step = '1';
-                        valeurInput.max = '';
-                    }
-                });
-                
-                // Déclencher l'événement au chargement
-                typeRemise.dispatchEvent(new Event('change'));
-            }
-        });
-    </script>
+</div>
 @endsection 

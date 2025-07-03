@@ -136,7 +136,7 @@
                     @endif
                 </td>
                 <td>{{ $activite->description }}</td>
-                <td>{{ $activite->user ? $activite->user->name : 'Système' }}</td>
+                <td>{{ optional($activite->user)->name ?? 'Système' }}</td>
                 <td>{{ $activite->model_type ? $activite->model_type . ' #' . $activite->model_id : '-' }}</td>
             </tr>
             @empty

@@ -9,7 +9,7 @@
                         <svg class="w-8 h-8 text-blue-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 13V7m0 6l-3 3m3-3l3 3m9-3V7m0 6l-3 3m3-3l3 3m-9 8a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Nouveau Mouvement de Stock
+                        Voir mouvements de stock
                     </h2>
                     <p class="mt-2 text-lg text-gray-500">Enregistrez une entrée ou une sortie de stock pour un produit</p>
                 </div>
@@ -180,7 +180,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Produit -->
                         <div>
-                            <label for="product_id" class="block text-sm font-medium text-gray-700 mb-1">Produit concerné</label>
+                            <label for="produit_id" class="block text-sm font-medium text-gray-700 mb-1">Produit concerné</label>
                             @if($selectedProduct)
                                 <input type="hidden" name="produit_id" value="{{ $selectedProduct->id }}">
                                 <div class="mt-1 p-2 w-full bg-gray-100 rounded-lg border border-gray-200">
@@ -189,7 +189,7 @@
                                 </div>
                                 <div class="mt-1 text-xs text-blue-500"><i class="fas fa-lock mr-1"></i> Produit verrouillé</div>
                             @else
-                                <select name="product_id" id="product_id" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <select name="produit_id" id="product_id" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                     <option value="">Sélectionnez un produit</option>
                                     @foreach($products as $product)
                                         <option value="{{ $product->id }}" @selected(old('product_id', $selectedProductId ?? null) == $product->id)
@@ -202,7 +202,7 @@
                                     @endforeach
                                 </select>
                             @endif
-                            @error('product_id')
+                            @error('produit_id')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>

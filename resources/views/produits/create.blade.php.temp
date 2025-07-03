@@ -1,0 +1,161 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="py-12">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <!-- Header moderne -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10 animate-fade-in-down">
+            <div>
+                <h1 class="text-4xl font-extrabold bg-gradient-to-tr from-indigo-600 via-blue-500 to-purple-600 bg-clip-text text-transparent tracking-tight drop-shadow-lg">Nouveau Produit</h1>
+                <p class="mt-2 text-lg text-gray-500">Créez un nouveau produit en renseignant les informations ci-dessous.</p>
+            </div>
+            <a href="{{ route('produits.index') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-arrow-left"></i>
+                Retour à la liste
+            </a>
+        </div>
+
+        <!-- Formulaire principal -->
+        <div class="relative bg-white/60 backdrop-blur-xl border border-indigo-100 rounded-2xl shadow-2xl p-8 mb-8">
+            <form action="{{ route('produits.store') }}" method="POST" enctype="multipart/form-data" id="productForm" class="space-y-8">
+                @csrf
+
+                <!-- Section 1: Informations Générales & Image -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Colonne Informations Générales -->
+                    <div class="lg:col-span-2 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-6">
+                        <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-tag text-indigo-500"></i> Informations Générales
+                        </h3>
+                        
+                        <!-- Champs existants... -->
+                    </div>
+
+                    <!-- Colonne Image -->
+                    <div class="lg:col-span-1 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-4">
+                        <!-- Contenu existant... -->
+                    </div>
+                </div>
+
+                <!-- Section 2: Détails & Spécifications -->
+                <div class="bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6">
+                    <!-- Contenu existant... -->
+                </div>
+
+                <!-- Section 3: Conditionnements -->
+                <div class="bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-6">
+                    <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                        <i class="fas fa-cubes text-indigo-500"></i> Tarifs par conditionnement
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-4 gap-4 font-medium text-indigo-700">
+                            <div>Type</div>
+                            <div>Quantité</div>
+                            <div>Prix (FCFA)</div>
+                            <div></div>
+                        </div>
+                        
+                        <div id="conditionnements-list" class="space-y-3">
+                            @foreach(old('conditionnements', []) as $i => $cond)
+                                <div class="grid grid-cols-4 gap-4 items-center">
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-box text-indigo-400"></i>
+                                        </div>
+                                        <input type="text" name="conditionnements[{{ $i }}][type]" value="{{ $cond['type'] }}" 
+                                            class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all" 
+                                            required placeholder="Ex: unité, quart...">
+                                    </div>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-hashtag text-indigo-400"></i>
+                                        </div>
+                                        <input type="number" name="conditionnements[{{ $i }}][quantite]" value="{{ $cond['quantite'] }}" 
+                                            class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all" 
+                                            min="1" required>
+                                    </div>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-money-bill text-indigo-400"></i>
+                                        </div>
+                                        <input type="number" name="conditionnements[{{ $i }}][prix]" value="{{ $cond['prix'] }}" 
+                                            class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all" 
+                                            min="0" step="0.01" required>
+                                    </div>
+                                    <button type="button" class="remove-cond inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors duration-200">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                        
+                        <button type="button" id="add-cond" 
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-tr from-indigo-600 to-purple-500 text-white rounded-lg shadow-md hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                            <i class="fas fa-plus"></i>
+                            Ajouter un conditionnement
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Boutons de soumission -->
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-tr from-green-500 to-emerald-600 text-white font-bold text-lg shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                        <i class="fas fa-save"></i>
+                        Enregistrer le Produit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let condIndex = {{ count(old('conditionnements', [])) }};
+    document.getElementById('add-cond').addEventListener('click', function() {
+        const list = document.getElementById('conditionnements-list');
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-4 gap-4 items-center';
+        row.innerHTML = `
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-box text-indigo-400"></i>
+                </div>
+                <input type="text" name="conditionnements[${condIndex}][type]" 
+                    class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all" 
+                    required placeholder="Ex: unité, quart...">
+            </div>
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-hashtag text-indigo-400"></i>
+                </div>
+                <input type="number" name="conditionnements[${condIndex}][quantite]" 
+                    class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all" 
+                    min="1" required>
+            </div>
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-money-bill text-indigo-400"></i>
+                </div>
+                <input type="number" name="conditionnements[${condIndex}][prix]" 
+                    class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all" 
+                    min="0" step="0.01" required>
+            </div>
+            <button type="button" class="remove-cond inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors duration-200">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        list.appendChild(row);
+        condIndex++;
+    });
+    document.getElementById('conditionnements-list').addEventListener('click', function(e) {
+        if (e.target.closest('.remove-cond')) {
+            e.target.closest('.grid').remove();
+        }
+    });
+});
+</script>
+@endpush 

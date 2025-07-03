@@ -35,7 +35,7 @@ class ClientRequest extends FormRequest
 
         // Validation d'unicité du code (pour la création et la mise à jour)
         if ($this->route('client')) { // Si on est en train de mettre à jour un client
-            $rules['code'] = ['required', 'string', 'max:20', Rule::unique('clients', 'code')->ignore($this->route('client')->id)];
+            $rules['code'] = ['required', 'string', 'max:20', Rule::unique('clients', 'code')->ignore($this->route('client'))];
         } else { // Si on est en train de créer un nouveau client
             $rules['code'] = ['required', 'string', 'max:20', Rule::unique('clients', 'code')];
         }

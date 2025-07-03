@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +15,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::with('roles')->paginate(10);
+        $users = User::paginate(10);
         return view('users.index', compact('users'));
     }
 
@@ -25,7 +24,14 @@ class UserController extends Controller
      */
     public function create()
     {
-        $roles = Role::with('permissions')->get();
+        // Liste des rôles disponibles
+        $roles = [
+            User::ROLE_SUPER_ADMIN => 'Super Administrateur',
+            User::ROLE_ADMIN => 'Administrateur',
+            User::ROLE_RESPONSABLE => 'Responsable',
+            User::ROLE_CAISSIER => 'Caissier'
+        ];
+        
         return view('users.create', compact('roles'));
     }
 
@@ -36,29 +42,25 @@ class UserController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()],
+            'email' => 'nullable|string|email|max:255|unique:users',
+            'password' => ['required', 'confirmed', Password::min(8)],
             'telephone' => 'nullable|string|max:20',
             'adresse' => 'nullable|string|max:255',
-            'roles' => 'nullable|array',
-            'roles.*' => 'exists:roles,id',
-            'actif' => 'nullable|boolean'
+            'role' => 'required|string|in:' . implode(',', [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_RESPONSABLE, User::ROLE_CAISSIER]),
+            'actif' => 'nullable|boolean',
+            'superette_id' => $request->role === User::ROLE_SUPER_ADMIN ? 'nullable|exists:superettes,id' : 'required|exists:superettes,id',
         ]);
 
-        DB::transaction(function () use ($request) {
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'telephone' => $request->telephone,
-                'adresse' => $request->adresse,
-                'actif' => $request->has('actif') ? 1 : 0
-            ]);
-
-            if ($request->has('roles')) {
-                $user->roles()->attach($request->roles);
-            }
-        });
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'telephone' => $request->telephone,
+            'adresse' => $request->adresse,
+            'role' => $request->role,
+            'actif' => $request->has('actif') ? 1 : 0,
+            'superette_id' => $request->superette_id
+        ]);
 
         return redirect()->route('users.index')
             ->with('success', 'Utilisateur créé avec succès.');
@@ -69,10 +71,6 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        $user->load('roles.permissions');
-        // Si vous avez un package de suivi d'activités comme spatie/laravel-activitylog, vous pouvez l'utiliser ici
-        // $activities = $user->activities()->orderBy('created_at', 'desc')->take(10)->get();
-        
         return view('users.show', compact('user'));
     }
 
@@ -81,7 +79,14 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        $roles = Role::with('permissions')->get();
+        // Liste des rôles disponibles
+        $roles = [
+            User::ROLE_SUPER_ADMIN => 'Super Administrateur',
+            User::ROLE_ADMIN => 'Administrateur',
+            User::ROLE_RESPONSABLE => 'Responsable',
+            User::ROLE_CAISSIER => 'Caissier'
+        ];
+        
         return view('users.edit', compact('user', 'roles'));
     }
 
@@ -92,44 +97,37 @@ class UserController extends Controller
     {
         $rules = [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
+            'email' => 'nullable|string|email|max:255|unique:users,email,'.$user->id,
             'telephone' => 'nullable|string|max:20',
             'adresse' => 'nullable|string|max:255',
-            'roles' => 'nullable|array',
-            'roles.*' => 'exists:roles,id',
-            'actif' => 'nullable|boolean'
+            'role' => 'required|string|in:' . implode(',', [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_RESPONSABLE, User::ROLE_CAISSIER]),
+            'actif' => 'nullable|boolean',
+            'superette_id' => $request->role === User::ROLE_SUPER_ADMIN ? 'nullable|exists:superettes,id' : 'required|exists:superettes,id',
         ];
 
         // Vérifier si un mot de passe a été fourni
         if ($request->filled('password')) {
-            $rules['password'] = ['confirmed', Password::min(8)->mixedCase()->numbers()];
+            $rules['password'] = ['confirmed', Password::min(8)];
         }
 
         $request->validate($rules);
 
-        DB::transaction(function () use ($request, $user) {
-            $userData = [
-                'name' => $request->name,
-                'email' => $request->email,
-                'telephone' => $request->telephone,
-                'adresse' => $request->adresse,
-                'actif' => $request->has('actif') ? 1 : 0
-            ];
+        $userData = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'telephone' => $request->telephone,
+            'adresse' => $request->adresse,
+            'role' => $request->role,
+            'actif' => $request->has('actif') ? 1 : 0,
+            'superette_id' => $request->superette_id
+        ];
 
-            // Mettre à jour le mot de passe si fourni
-            if ($request->filled('password')) {
-                $userData['password'] = Hash::make($request->password);
-            }
+        // Mettre à jour le mot de passe si fourni
+        if ($request->filled('password')) {
+            $userData['password'] = Hash::make($request->password);
+        }
 
-            $user->update($userData);
-
-            // Synchroniser les rôles
-            if ($request->has('roles')) {
-                $user->roles()->sync($request->roles);
-            } else {
-                $user->roles()->detach();
-            }
-        });
+        $user->update($userData);
 
         return redirect()->route('users.index')
             ->with('success', 'Utilisateur mis à jour avec succès.');
@@ -141,12 +139,11 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         // Empêcher la suppression de l'administrateur principal
-        if ($user->hasRole('Administrateur')) {
+        if ($user->isSuperAdmin()) {
             return redirect()->route('users.index')
-                ->with('error', 'Impossible de supprimer un utilisateur avec le rôle Administrateur.');
+                ->with('error', 'Impossible de supprimer un Super Administrateur.');
         }
 
-        $user->roles()->detach();
         $user->delete();
 
         return redirect()->route('users.index')

@@ -73,6 +73,9 @@ class AlertService
             $message = "ATTENTION: Stock en diminution pour {$produit->nom}. Stock actuel: {$produit->stock}, seuil d'alerte: {$produit->seuil_alerte}";
         }
         
+        // Récupération de la supérette active
+        $superetteId = $produit->superette_id;
+        
         // Création ou mise à jour de l'alerte si nécessaire
         if ($alertType) {
             $existingAlert = Alerte::where('produit_id', $produit->id)
@@ -102,7 +105,8 @@ class AlertService
                     'type' => $alertType,
                     'produit_id' => $produit->id,
                     'message' => $message,
-                    'seuil' => $produit->seuil_alerte
+                    'seuil' => $produit->seuil_alerte,
+                    'superette_id' => $superetteId
                 ]);
                 
                 // Enregistrement dans l'historique
@@ -118,10 +122,13 @@ class AlertService
                 $this->sendUrgentSmsNotification($produit, $message);
             }
         } else {
-            // Résolution des alertes existantes si le stock est revenu à la normale
-            Alerte::where('produit_id', $produit->id)
+            // Si aucune alerte n'est nécessaire (stock OK), supprimer l'alerte existante
+            $existingAlert = Alerte::where('produit_id', $produit->id)
                 ->where('type', 'LIKE', 'stock%')
-                ->update(['date_resolution' => now()]);
+                ->first();
+            if ($existingAlert) {
+                $existingAlert->delete();
+            }
         }
     }
     
@@ -150,12 +157,15 @@ class AlertService
         if ($daysUntilExpiration <= 5) {
             // Alerte critique - 5 jours ou moins avant péremption
             $alertType = 'peremption_critique';
-            $message = "URGENT: Le produit {$product->nom} expire dans {$daysUntilExpiration} jours. Envisager une promotion ou une action immédiate.";
+            $message = "URGENT: Le produit {$produit->nom} expire dans {$daysUntilExpiration} jours. Envisager une promotion ou une action immédiate.";
         } elseif ($daysUntilExpiration <= 15) {
             // Alerte normale - 15 jours ou moins avant péremption
             $alertType = 'peremption_proche';
-            $message = "ATTENTION: Le produit {$product->nom} expire dans {$daysUntilExpiration} jours.";
+            $message = "ATTENTION: Le produit {$produit->nom} expire dans {$daysUntilExpiration} jours.";
         }
+        
+        // Récupération de la supérette active
+        $superetteId = $produit->superette_id;
         
         // Création ou mise à jour de l'alerte si nécessaire
         if ($alertType) {
@@ -187,7 +197,8 @@ class AlertService
                     'type' => $alertType,
                     'produit_id' => $produit->id,
                     'message' => $message,
-                    'date_peremption' => $produit->date_peremption
+                    'date_peremption' => $produit->date_peremption,
+                    'superette_id' => $superetteId
                 ]);
                 
                 // Enregistrement dans l'historique

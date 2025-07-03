@@ -19,7 +19,20 @@ class VenteController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Vente::with(['client', 'employe', 'details'])
+        $superetteId = session('active_superette_id') ?? (auth()->user()->superette_id ?? null);
+        $query = Vente::withoutGlobalScopes()
+            ->where('superette_id', $superetteId)
+            ->with([
+                'client' => function($query) {
+                    $query->withoutGlobalScopes();
+                },
+                'employe' => function($query) {
+                    $query->withoutGlobalScopes();
+                },
+                'details' => function($query) {
+                    $query->withoutGlobalScopes();
+                }
+            ])
             ->orderBy('created_at', 'desc');
 
         // Filtres
@@ -40,14 +53,14 @@ class VenteController extends Controller
         }
 
         $ventes = $query->paginate(15);
-        $clients = Client::all();
-        $employes = Employe::all();
+        $clients = Client::withoutGlobalScopes()->get();
+        $employes = Employe::withoutGlobalScopes()->get();
 
-        // Statistiques rapides pour la vue
-        $totalVentes = Vente::count();
-        $montantTotal = Vente::sum('montant_total');
-        $montantPaye = Vente::sum('montant_paye');
-        $clientsCount = Client::count();
+        // Statistiques rapides pour la vue (filtrées par superette)
+        $totalVentes = Vente::withoutGlobalScopes()->where('superette_id', $superetteId)->count();
+        $montantTotal = Vente::withoutGlobalScopes()->where('superette_id', $superetteId)->sum('montant_total');
+        $montantPaye = Vente::withoutGlobalScopes()->where('superette_id', $superetteId)->sum('montant_paye');
+        $clientsCount = Client::withoutGlobalScopes()->count();
 
         return view('ventes.index', compact('ventes', 'clients', 'employes', 'totalVentes', 'montantTotal', 'montantPaye', 'clientsCount'));
     }
@@ -59,7 +72,34 @@ class VenteController extends Controller
     {
         $clients = Client::all();
         $employes = Employe::all();
-        $produits = Produit::where('stock', '>', 0)->get();
+        $produits = Produit::where('stock', '>', 0)
+            ->with('conditionnements')
+            ->get()
+            ->map(function($produit) {
+                // Prix promo (accessor) et promotion détaillée
+                $produit->prix_promo = $produit->prix_promo;
+                $promo = $produit->promotion_active;
+                $produit->promotion = $promo ? [
+                    'type' => $promo->type, // pourcentage ou montant
+                    'valeur' => $promo->valeur,
+                ] : null;
+                
+                // S'assurer que les conditionnements sont disponibles pour le frontend
+                if (!isset($produit->conditionnements)) {
+                    $produit->conditionnements = [];
+                }
+                
+                return $produit;
+            });
+        
+        // Debug des conditionnements
+        \Log::debug('Produits pour la vue de vente', [
+            'nombre_produits' => $produits->count(),
+            'exemple_produit' => $produits->first() ? [
+                'nom' => $produits->first()->nom,
+                'conditionnements' => $produits->first()->conditionnements->count()
+            ] : null
+        ]);
 
         return view('ventes.create', compact('clients', 'employes', 'produits'));
     }
@@ -74,18 +114,39 @@ class VenteController extends Controller
         try {
             Log::info('VenteController@store - Données reçues:', $request->all());
 
+            // Déterminer l'employé lié à l'utilisateur connecté (caissier)
             $employe_id = null;
+            if (auth()->check()) {
+                $employe_id = auth()->user()->employe?->id;
+
+                // Si aucun employé associé, créer un enregistrement minimal
+                if (!$employe_id) {
+                    $nouvelEmploye = Employe::create([
+                        'nom' => auth()->user()->name,
+                        'user_id' => auth()->id(),
+                        // Pas besoin d'email pour les employés créés automatiquement
+                    ]);
+                    $employe_id = $nouvelEmploye->id;
+                }
+            }
+
+            // Sécurité : si toujours null, lever une exception explicite
             if (!$employe_id) {
-                
-                $employe_id = 1; // Ou assigner un ID d'employé système/par défaut
+                throw new \Exception('Impossible de déterminer l\'employé associé.');
+            }
+
+            // Récupérer la superette active
+            $superette_id = session('active_superette_id') ?? (auth()->user()->superette_id ?? null);
+            if (!$superette_id) {
+                throw new \Exception('Impossible de déterminer la supérette active.');
             }
 
             $vente = Vente::create([
                 'client_id' => $request->client_id,
                 'employe_id' => $employe_id,
-                'type_vente' => $request->type_vente,
+                'superette_id' => $superette_id,
+                'type_vente' => $request->input('type_vente', 'vente'),
                 'date_vente' => now(),
-                'type_vente' => $request->input('type_vente', 'vente'), // Ajout d'une valeur par défaut
                 'montant_total' => 0,
                 'montant_paye' => $request->input('montant_paye', 0),
                 'montant_restant' => 0,
@@ -148,9 +209,27 @@ class VenteController extends Controller
     /**
      * Affiche les détails d'une vente
      */
-    public function show(Vente $vente)
+    public function show($id)
     {
-        $vente->load(['client', 'employe', 'details.produit']);
+        // Utiliser withoutGlobalScopes pour ignorer le scope de superette
+        $vente = Vente::withoutGlobalScopes()->findOrFail($id);
+        
+        // Charger les relations en désactivant les global scopes pour éviter les filtres par superette
+        $vente->load([
+            'client' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'employe' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'details.produit' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'remises' => function($query) {
+                $query->withoutGlobalScopes();
+            }
+        ]);
+        
         return view('ventes.show', compact('vente'));
     }
 
@@ -228,7 +307,19 @@ class VenteController extends Controller
      */
     public function recu(Vente $vente)
     {
-        $vente->load(['client', 'employe', 'details.produit']);
+        // Charger les relations sans appliquer le SuperetteScope
+        $vente->load([
+            'client' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'employe' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'details.produit' => function($query) {
+                $query->withoutGlobalScopes();
+            }
+        ]);
+        
         return view('ventes.recu', compact('vente'));
     }
 
@@ -237,7 +328,20 @@ class VenteController extends Controller
      */
     public function imprimerFacture(Vente $vente)
     {
-        $vente->load(['client', 'employe', 'details.produit', 'paiements']);
+        // Charger les relations sans appliquer le SuperetteScope
+        $vente->load([
+            'client' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'employe' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'details.produit' => function($query) {
+                $query->withoutGlobalScopes();
+            },
+            'paiements'
+        ]);
+        
         return view('ventes.facture', compact('vente'));
     }
     
@@ -252,26 +356,38 @@ class VenteController extends Controller
         try {
             Log::info('VenteController@storeExpress - Utilisation du mode direct:', $request->all());
 
-            // Suppression du contrôle d'authentification
-            
-                $employe_id = null;
-            
-                // Prendre le premier employé existant
-$employe_id = \App\Models\Employe::query()->value('id');
+            // Déterminer l'employé lié à l'utilisateur connecté (caissier)
+            $employe_id = null;
+            if (auth()->check()) {
+                $employe_id = auth()->user()->employe?->id;
+
+                // Si aucun employé associé, créer un enregistrement minimal
                 if (!$employe_id) {
-                    DB::rollBack();
-                    Log::error('Aucun employé trouvé pour l\'attribution de la vente.');
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Aucun employé n\'existe en base, impossible d\'enregistrer la vente.'
-                    ], 422);
-                
+                    $nouvelEmploye = Employe::create([
+                        'nom' => auth()->user()->name,
+                        'user_id' => auth()->id(),
+                        // Pas besoin d'email pour les employés créés automatiquement
+                    ]);
+                    $employe_id = $nouvelEmploye->id;
+                }
+            }
+
+            // Sécurité : si toujours null, lever une exception explicite
+            if (!$employe_id) {
+                throw new \Exception('Impossible de déterminer l\'employé associé.');
+            }
+
+            // Récupérer la superette active
+            $superette_id = session('active_superette_id') ?? (auth()->user()->superette_id ?? null);
+            if (!$superette_id) {
+                throw new \Exception('Impossible de déterminer la supérette active.');
             }
 
             // Créer la vente directement
             $vente = new Vente();
             $vente->client_id = $request->input('client_id');
             $vente->employe_id = $employe_id;
+            $vente->superette_id = $superette_id;
             // Forcer la valeur du champ type_vente à une valeur autorisée par la base de données
             $type_vente = $request->input('type_vente', 'sur_place');
             $types_autorises = ['sur_place', 'a_emporter', 'livraison'];

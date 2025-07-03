@@ -85,9 +85,9 @@
                     </span>
                     <span class="text-2xl font-bold text-indigo-700 tracking-wide">Scannez un produit</span>
                 </div>
-                <input type="text" x-ref="usbScan" x-model="barcode" @keydown.enter.prevent="scannerCodeBarre(); $refs.usbScan.select()" autofocus autocomplete="off"
-                    class="text-center text-3xl tracking-widest font-mono font-bold bg-gray-50 border-2 border-indigo-400 rounded-xl px-8 py-5 outline-none shadow focus:border-green-500 transition-all mx-auto w-full max-w-md focus:ring-2 focus:ring-indigo-200"
-                    placeholder="Scannez ou tapez le code-barre puis validez"
+                <input type="text" x-ref="usbScan" x-model="barcode" autofocus autocomplete="off"
+                    class="text-center text-xl tracking-wide font-mono font-semibold bg-gray-50 border border-indigo-400 rounded-lg px-4 py-3 outline-none shadow focus:border-green-500 transition-all mx-auto w-full max-w-md focus:ring-2 focus:ring-indigo-200"
+                    placeholder="Scannez le code-barre"
                     @input="if(barcode.length > 30) barcode = ''" @focus="$event.target.select()" aria-label="Champ de scan code-barre">
                 <div class="text-gray-400 text-xs mt-2 mb-4">Le champ reste sélectionné, scannez à la chaîne sans cliquer !</div>
                 <template x-if="scanFeedback">
@@ -104,19 +104,6 @@
                         </template>
                     </div>
                 </template>
-                <div class="mt-6">
-                    <div class="text-sm font-semibold text-indigo-700 mb-2">Derniers scans</div>
-                    <ul class="flex flex-col gap-1 items-center">
-                        <template x-for="(scan, idx) in scanHistory.slice(-5).reverse()" :key="idx">
-                            <li class="flex gap-2 items-center text-base font-mono">
-                                <span class="px-2 py-1 rounded bg-gray-100 border border-gray-300 text-gray-700" x-text="scan.code"></span>
-                                <span :class="{'text-green-600': scan.status === 'ok', 'text-red-600': scan.status === 'nok'}">
-                                    <i :class="scan.status === 'ok' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
-                                </span>
-                            </li>
-                        </template>
-                    </ul>
-                </div>
             </div>
         </div>
         <div class="mt-2" x-show="suggestions.length > 0">
@@ -136,9 +123,28 @@
 
     <!-- Étape 3 : Panier -->
     <div class="bg-white/90 shadow-xl rounded-2xl p-6 mb-6 border border-emerald-100">
-        <h3 class="text-lg font-semibold text-emerald-700 mb-4 flex items-center gap-2">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-emerald-700 flex items-center gap-2">
             <i class="fas fa-shopping-cart"></i> Panier
         </h3>
+            <button @click="togglePriceDetails()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">
+                <i class="fas" :class="showPriceDetails ? 'fa-eye-slash' : 'fa-eye'"></i>
+                <span x-text="showPriceDetails ? 'Masquer les détails' : 'Afficher les détails'"></span>
+            </button>
+        </div>
+        
+        <!-- Message d'information sur les conditionnements automatiques -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 rounded shadow-md">
+            <div class="flex items-start">
+                <i class="fas fa-info-circle mt-0.5 mr-2"></i>
+                <div>
+                    <p class="font-semibold">Application automatique des conditionnements et promotions</p>
+                    <p class="text-sm">Le système applique automatiquement les tarifs par conditionnement quand vous atteignez la quantité requise. Les promotions sont également appliquées automatiquement et sont cumulables avec les prix par conditionnement.</p>
+                    <p class="text-sm mt-1">Vous pouvez désactiver l'application automatique des conditionnements en décochant la case "Auto" à côté de la quantité.</p>
+                </div>
+            </div>
+        </div>
+        
         <template x-if="panier.length === 0">
             <div class="text-gray-400 italic">Aucun produit dans le panier.</div>
         </template>
@@ -148,16 +154,28 @@
                     <tr>
                         <th class="p-2">Produit</th>
                         <th class="p-2 text-center">Qté</th>
-                        <th class="p-2 text-right">PU</th>
-                        <th class="p-2 text-right">Remise</th>
-                        <th class="p-2 text-right">Total</th>
+                        <th class="p-2 text-center">Prix unitaire</th>
+                        <th class="p-2 text-right">Total ligne</th>
                         <th class="p-2 text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="(item, idx) in panier" :key="item.id">
-                        <tr class="hover:bg-gray-50 border-t">
-                            <td class="p-2"><span x-text="item.nom" class="font-medium"></span></td>
+                        <tr class="hover:bg-gray-50 border-t" :class="{'bg-yellow-50': item.prix_promo < item.prix_vente}">
+                            <td class="p-2">
+                                <div class="flex flex-col">
+                                    <span x-text="item.nom.split(' - ')[0]" class="font-medium"></span>
+                                    <template x-if="item.conditionnement_selectionne">
+                                        <span class="text-xs text-blue-600 font-semibold">
+                                            <i class="fas fa-box mr-1"></i>
+                                            <span x-text="item.nom.includes(' - ') ? item.nom.split(' - ')[1] : ''"></span>
+                                        </span>
+                                    </template>
+                                    <span x-show="item.prix_promo < item.prix_vente" class="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full inline-block w-fit mt-1">
+                                        <i class="fas fa-tag mr-1"></i>Promo
+                                    </span>
+                                </div>
+                            </td>
                             <td class="p-2 text-center">
                                 <div class="flex items-center justify-center">
                                     <button type="button" @click="diminuerQuantite(idx)" 
@@ -172,28 +190,139 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
+                                <!-- Indicateur de conditionnement automatique -->
+                                <div class="mt-1">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" x-model="item.conditionnement_auto" class="form-checkbox h-4 w-4 text-blue-600" @change="appliquerConditionnementAutomatique(idx)">
+                                        <span class="ml-1 text-xs text-gray-600">Auto</span>
+                                    </label>
+                                </div>
                             </td>
-                            <td class="p-2 text-right font-medium"><span x-text="formatPrix(item.prix_vente)"></span> FCFA</td>
+                            <td class="p-2">
+                                <!-- Mode détaillé -->
+                                <template x-if="showPriceDetails">
+                                    <div class="flex flex-col">
+                                        <!-- Prix unitaire avec informations détaillées -->
+                                        <div class="flex flex-col items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <!-- Prix de base -->
+                                            <div class="w-full flex justify-between items-center mb-1">
+                                                <span class="text-xs text-gray-500">Prix base:</span>
+                                                <span class="text-xs font-medium" x-text="formatPrix(item.prix_unitaire_base)"></span>
+                                            </div>
+                                            
+                                            <!-- Prix conditionné si applicable -->
+                                            <template x-if="item.conditionnement_selectionne">
+                                                <div class="w-full flex justify-between items-center mb-1">
+                                                    <span class="text-xs text-blue-600">Prix pack:</span>
+                                                    <span class="text-xs font-medium text-blue-600" x-text="formatPrix(item.prix_vente)"></span>
+                                                </div>
+                                            </template>
+                                            
+                                            <!-- Prix promotionnel si applicable -->
+                                            <template x-if="item.prix_promo < item.prix_vente">
+                                                <div class="w-full flex justify-between items-center mb-1">
+                                                    <span class="text-xs text-green-600">Prix promo:</span>
+                                                    <span class="text-xs font-medium text-green-600" x-text="formatPrix(item.prix_promo)"></span>
+                                                </div>
+                                            </template>
+                                            
+                                            <!-- Prix final -->
+                                            <div class="w-full flex justify-between items-center pt-1 border-t border-gray-200">
+                                                <span class="font-medium">Prix final:</span>
+                                                <span class="font-bold" x-text="formatPrix(item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente)"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Remise -->
+                                        <div class="mt-2 hidden">
+                                            <label class="block text-xs text-center mb-1">Remise</label>
+                                            <input type="number" min="0" x-model.number="item.remise" class="w-full rounded border-gray-300 text-center" @change="majRemise(idx)">
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <!-- Mode simplifié -->
+                                <template x-if="!showPriceDetails">
+                                    <div class="flex flex-col items-center">
+                                        <div class="flex flex-col items-center mb-2">
+                                            <span class="font-bold text-lg" x-text="formatPrix(item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente)"></span>
+                                            <template x-if="item.prix_promo < item.prix_vente">
+                                                <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Promo</span>
+                                            </template>
+                                            <template x-if="item.conditionnement_selectionne">
+                                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full mt-1">Pack</span>
+                                            </template>
+                                        </div>
+                                        
+                                        <!-- Remise simplifiée -->
+                                        <div class="hidden">
+                                            <input type="number" min="0" x-model.number="item.remise" class="w-full rounded border-gray-300 text-center text-sm" @change="majRemise(idx)" placeholder="Remise">
+                                        </div>
+                                    </div>
+                                </template>
+                            </td>
                             <td class="p-2 text-right">
-                                <input type="number" min="0" x-model.number="item.remise" class="w-16 rounded border-gray-300 text-center" @change="majRemise(idx)">
+                                <!-- Mode détaillé -->
+                                <template x-if="showPriceDetails">
+                                    <div class="flex flex-col items-end">
+                                        <!-- Prix total avant remise -->
+                                        <div class="mb-1">
+                                            <span class="text-sm" x-text="formatPrix((item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente) * item.quantite)"></span>
+                                        </div>
+                                        
+                                        <!-- Remise si applicable -->
+                                        <template x-if="item.remise > 0">
+                                            <div class="text-red-600 text-sm">
+                                                - <span x-text="formatPrix(item.remise)"></span>
+                                            </div>
+                                        </template>
+                                        
+                                        <!-- Total final -->
+                                        <div class="font-bold text-lg mt-1 pt-1 border-t border-gray-200">
+                                            <span x-text="formatPrix((item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente) * item.quantite)"></span> FCFA
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <!-- Mode simplifié -->
+                                <template x-if="!showPriceDetails">
+                                    <div class="flex flex-col items-end">
+                                        <div class="font-bold text-lg">
+                                            <span x-text="formatPrix((item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente) * item.quantite)"></span>
+                                        </div>
+                                        <template x-if="item.remise > 0">
+                                            <div class="text-xs text-red-600">
+                                                (remise: <span x-text="formatPrix(item.remise)"></span>)
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
                             </td>
-                            <td class="p-2 text-right font-bold"><span x-text="formatPrix(item.prix_vente * item.quantite - item.remise)"></span> FCFA</td>
                             <td class="p-2 text-center">
-                                <button type="button" class="text-red-600 hover:text-red-800" @click="supprimerDuPanier(idx)"><i class="fas fa-trash"></i></button>
+                                <div class="flex items-center justify-center gap-2">
+                                    <button type="button" class="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50" @click="afficherDetailsCalcul(idx)" title="Voir les détails du calcul">
+                                        <i class="fas fa-info-circle"></i>
+                                    </button>
+                                    <button type="button" class="text-gray-600 hover:text-gray-800 p-2 rounded-full hover:bg-gray-50" @click="togglePriceDetails()" title="Afficher/masquer les détails de prix">
+                                        <i class="fas" :class="showPriceDetails ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                    </button>
+                                    <button type="button" class="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50" @click="supprimerDuPanier(idx)" title="Supprimer du panier">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </template>
                 </tbody>
-                <tfoot class="bg-gray-50 font-bold border-t-2 border-gray-300">
+                <tfoot class="bg-gradient-to-r from-indigo-50 to-purple-50 font-bold border-t-2 border-indigo-200">
                     <tr>
-                        <td colspan="4" class="p-2 text-right">TOTAL :</td>
-                        <td class="p-2 text-right text-indigo-700"><span x-text="formatPrix(totalPanier)"></span> FCFA</td>
+                        <td colspan="2" class="p-3 text-right">TOTAL :</td>
+                        <td colspan="2" class="p-3 text-right text-indigo-700 text-xl"><span x-text="formatPrix(totalPanier)"></span> FCFA</td>
                         <td></td>
                     </tr>
                 </tfoot>
             </table>
         </template>
-        <!-- Le total est maintenant dans le tfoot du tableau -->
     </div>
     
     <!-- Récapitulatif des achats -->
@@ -213,14 +342,12 @@
                         <span>Nombre de produits différents :</span>
                         <span x-text="panier.length" class="font-medium"></span>
                     </li>
-                    <li class="flex justify-between">
-                        <span>Total remises :</span>
-                        <span x-text="formatPrix(panier.reduce((acc, item) => acc + item.remise, 0)) + ' FCFA'" class="font-medium"></span>
-                    </li>
-                    <li class="flex justify-between text-lg font-bold text-purple-900 border-t border-purple-200 pt-2 mt-2">
-                        <span>Total à payer :</span>
-                        <span x-text="formatPrix(totalPanier) + ' FCFA'"></span>
-                    </li>
+                    <template x-if="panier.some(item => item.prix_promo < item.prix_vente)">
+                        <li class="flex justify-between text-green-700">
+                            <span>Économies promotionnelles :</span>
+                            <span x-text="formatPrix(panier.reduce((acc, item) => acc + ((item.prix_vente - (item.prix_promo || item.prix_vente)) * item.quantite), 0)) + ' FCFA'" class="font-medium"></span>
+                        </li>
+                    </template>
                 </ul>
             </div>
             <div class="bg-blue-50/70 p-4 rounded-lg">
@@ -251,12 +378,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label for="modePaiement" class="block text-sm font-medium text-gray-700 mb-1">Mode de paiement <span class="text-red-500">*</span></label>
-                <select name="modePaiement" id="modePaiement" x-model="modePaiement" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500">
-                    <option value="">Sélectionner...</option>
-                    <option value="especes">Espèces</option>
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="carte">Carte bancaire</option>
-                </select>
+                <select name="modePaiement" id="modePaiement" x-model="modePaiement" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500" x-ref="modePaiement">
+    <option value="">Sélectionner...</option>
+    <option value="especes">Espèces</option>
+    <option value="mobile_money">Mobile Money</option>
+    <option value="carte">Carte bancaire</option>
+</select>
             </div>
             <div>
                 <label for="montantPaye" class="block text-sm font-medium text-gray-700 mb-1">Montant payé <span class="text-red-500">*</span></label>
@@ -284,6 +411,123 @@
         </button>
     </div>
 </div>
+
+<!-- Modale de détails de calcul -->
+<div x-show="showCalculDetails" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCalculDetails = false">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.outside="showCalculDetails = false">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800">
+                <i class="fas fa-calculator mr-2 text-blue-600"></i>
+                Détails du calcul de prix
+            </h2>
+            <button @click="showCalculDetails = false" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <template x-if="currentDetailIndex !== null && panier[currentDetailIndex]">
+            <div>
+                <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-bold text-blue-800" x-text="panier[currentDetailIndex].nom"></h3>
+                    <p class="text-sm text-blue-600">
+                        Quantité: <span class="font-medium" x-text="panier[currentDetailIndex].quantite"></span>
+                    </p>
+                </div>
+                
+                <!-- Prix de base -->
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-700 mb-2">Prix unitaire de base</h4>
+                    <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                        <div class="flex justify-between">
+                            <span>Prix catalogue:</span>
+                            <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).prixUnitaireBase + ' FCFA'"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Conditionnement si applicable -->
+                <template x-if="getDetailsCalcul(panier[currentDetailIndex]).aConditionnement">
+                    <div class="mb-4">
+                        <h4 class="font-medium text-blue-700 mb-2">
+                            <i class="fas fa-box mr-1"></i> Prix par conditionnement
+                        </h4>
+                        <div class="bg-blue-50 p-3 rounded border border-blue-200">
+                            <div class="flex justify-between mb-1">
+                                <span>Type de conditionnement:</span>
+                                <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).detailsConditionnement.type"></span>
+                            </div>
+                            <div class="flex justify-between mb-1">
+                                <span>Quantité par conditionnement:</span>
+                                <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).detailsConditionnement.quantite"></span>
+                            </div>
+                            <div class="flex justify-between mb-1">
+                                <span>Prix du conditionnement:</span>
+                                <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).detailsConditionnement.prix + ' FCFA'"></span>
+                            </div>
+                            <div class="flex justify-between pt-1 border-t border-blue-200">
+                                <span>Économie par conditionnement:</span>
+                                <span class="font-medium text-green-600" x-text="getDetailsCalcul(panier[currentDetailIndex]).detailsConditionnement.economie + ' FCFA'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Promotion si applicable -->
+                <template x-if="getDetailsCalcul(panier[currentDetailIndex]).aPromotion">
+                    <div class="mb-4">
+                        <h4 class="font-medium text-green-700 mb-2">
+                            <i class="fas fa-tag mr-1"></i> Promotion appliquée
+                        </h4>
+                        <div class="bg-green-50 p-3 rounded border border-green-200">
+                            <div class="flex justify-between mb-1">
+                                <span>Réduction:</span>
+                                <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).pourcentagePromotion"></span>
+                            </div>
+                            <div class="flex justify-between mb-1">
+                                <span>Prix unitaire après promotion:</span>
+                                <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).prixUnitaireFinal + ' FCFA'"></span>
+                            </div>
+                            <div class="flex justify-between pt-1 border-t border-green-200">
+                                <span>Économie totale (promotion):</span>
+                                <span class="font-medium text-green-600" x-text="getDetailsCalcul(panier[currentDetailIndex]).montantPromotion + ' FCFA'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Calcul final -->
+                <div class="mb-4">
+                    <h4 class="font-medium text-purple-700 mb-2">Calcul final</h4>
+                    <div class="bg-purple-50 p-3 rounded border border-purple-200">
+                        <div class="flex justify-between mb-1">
+                            <span>Prix unitaire final:</span>
+                            <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).prixUnitaireFinal + ' FCFA'"></span>
+                        </div>
+                        <div class="flex justify-between mb-1">
+                            <span>Quantité:</span>
+                            <span class="font-medium" x-text="panier[currentDetailIndex].quantite"></span>
+                        </div>
+                        <div class="flex justify-between mb-1">
+                            <span>Total avant remise:</span>
+                            <span class="font-medium" x-text="getDetailsCalcul(panier[currentDetailIndex]).totalAvantRemise + ' FCFA'"></span>
+                        </div>
+                        <template x-if="panier[currentDetailIndex].remise > 0">
+                            <div class="flex justify-between mb-1">
+                                <span>Remise manuelle:</span>
+                                <span class="font-medium text-red-600">- <span x-text="getDetailsCalcul(panier[currentDetailIndex]).remise"></span> FCFA</span>
+                            </div>
+                        </template>
+                        <div class="flex justify-between pt-1 border-t border-purple-200 font-bold">
+                            <span>Total final:</span>
+                            <span class="text-purple-700" x-text="getDetailsCalcul(panier[currentDetailIndex]).totalApresRemise + ' FCFA'"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
 @endSection
 @push('scripts')
 <!-- Ajout de la bibliothèque QuaggaJS pour le scanner de code-barre -->
@@ -298,16 +542,60 @@ document.addEventListener('alpine:init', () => {
         suggestions: [],
         showSuggestions: false,
         montantPaye: 0,
-        modePaiement: '',
+        modePaiement: 'especes',
         client_id: '',
-        type_vente: '',
+        type_vente: 'sur_place',
         loading: false,
         message: '',
         erreur: '',
         searchMode: 'text',  // 'text' ou 'barcode'
+        showCalculDetails: false, // Nouvel état pour afficher/masquer les détails
+        currentDetailIndex: null, // Index de l'élément du panier dont on affiche les détails
+        showPriceDetails: localStorage.getItem('showPriceDetails') !== 'false', // Charger la préférence depuis localStorage
         barcodeScanning: false,
         lastScannedBarcode: '',
-        barcodeScanner: null,
+        scanHistory: [],
+        scanFeedback: null,
+        barcode: '',
+        
+        // Nouvelle fonction pour basculer l'affichage des détails de prix
+        togglePriceDetails() {
+            this.showPriceDetails = !this.showPriceDetails;
+            // Sauvegarder la préférence dans localStorage
+            localStorage.setItem('showPriceDetails', this.showPriceDetails);
+        },
+        init() {
+            let buffer = '';
+            // Focus automatique sur le mode de paiement à l'ouverture
+            this.$nextTick(() => {
+                if (this.$refs.modePaiement) {
+                    this.$refs.modePaiement.focus();
+                }
+            });
+            let timer = null;
+            const resetBuffer = () => { buffer = ''; };
+            document.addEventListener('keydown', (e) => {
+                // Si on est dans un champ de saisie texte normal, on ignore
+                const tag = e.target.tagName.toLowerCase();
+                if (['input', 'textarea', 'select'].includes(tag) && e.target !== this.$refs.usbScan) {
+                    return;
+                }
+                if (e.key === 'Enter') {
+                    if (buffer.length) {
+                        this.scannerCodeBarre(buffer);
+                        buffer = '';
+                        if (timer) clearTimeout(timer);
+                    }
+                } else if (/^[0-9]$/.test(e.key)) {
+                    buffer += e.key;
+                    // Réinitialise après 300 ms d'inactivité (délimite un scan)
+                    if (timer) clearTimeout(timer);
+                    timer = setTimeout(resetBuffer, 300);
+                }
+            });
+            // Focus initial sur le champ
+            this.$nextTick(() => { this.$refs.usbScan && this.$refs.usbScan.focus(); });
+        },
         rechercherProduit() {
             if (this.search.trim().length === 0) {
                 this.suggestions = [];
@@ -319,25 +607,51 @@ document.addEventListener('alpine:init', () => {
             ).slice(0, 10); // Limite à 10 suggestions
         },
         selectionnerProduit(produit) {
-            const exist = this.panier.find(item => item.id === produit.id);
-            if (exist) {
-                // Si le produit existe déjà, augmenter simplement la quantité
-                exist.quantite++;
+            // Vérifier si le produit est déjà dans le panier
+            const index = this.panier.findIndex(item => item.id === produit.id);
+            
+            // Debug pour voir les informations de prix du produit
+            console.log('Produit sélectionné:', {
+                nom: produit.nom,
+                prix_vente_ttc: produit.prix_vente_ttc,
+                prix_promo: produit.prix_promo,
+                promotion: produit.promotion,
+                conditionnements: produit.conditionnements
+            });
+            
+            if (index !== -1) {
+                // Si oui, augmenter la quantité
+                this.panier[index].quantite++;
+                // Appliquer automatiquement les conditionnements si activé
+                this.appliquerConditionnementAutomatique(index);
             } else {
-                // Récupérer le prix unitaire depuis l'API pour être sûr d'avoir la dernière valeur
-                const prixUnitaire = Number(produit.prix_vente || produit.prix_vente_ttc || produit.prix || produit.pu || 0);
+                // Si non, ajouter le produit au panier avec ses conditionnements
+                const prixVente = produit.prix_vente_ttc || produit.prix_vente || produit.prix || produit.pu || 0;
+                const prixPromo = produit.prix_promo || prixVente;
                 
-                console.log('Produit sélectionné:', produit); // Debug
-                console.log('Prix unitaire brut:', produit.prix_vente); // Debug
-                console.log('Prix unitaire calculé:', prixUnitaire); // Debug
-                
-                this.panier.push({
+                const produitPanier = {
                     id: produit.id,
                     nom: produit.nom,
-                    prix_vente: prixUnitaire,
+                    prix_vente: prixVente,
+                    prix_promo: prixPromo,
+                    prix_unitaire_base: prixVente, // Garder le prix unitaire de base
                     quantite: 1,
-                    remise: 0
+                    remise: 0,
+                    conditionnements: produit.conditionnements || [],
+                    conditionnement_selectionne: null,
+                    conditionnement_auto: true, // Activer l'application automatique des conditionnements
+                    promotion: produit.promotion // Stocker les informations de promotion
+                };
+                
+                // Debug pour voir les prix calculés
+                console.log('Produit ajouté au panier:', {
+                    nom: produitPanier.nom,
+                    prix_vente: produitPanier.prix_vente,
+                    prix_promo: produitPanier.prix_promo,
+                    promotion: produitPanier.promotion
                 });
+                
+                this.panier.push(produitPanier);
             }
             this.search = '';
             this.suggestions = [];
@@ -357,30 +671,36 @@ document.addEventListener('alpine:init', () => {
         // Calculer le total du panier
         get totalPanier() {
             return this.panier.reduce((total, item) => {
-                return total + (item.prix_vente * item.quantite - item.remise);
+                const prixUnitaire = item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente;
+                return total + (prixUnitaire * item.quantite);
             }, 0);
         },
         
         // Gestion des quantités
         augmenterQuantite(idx) {
             this.panier[idx].quantite++;
+            this.appliquerConditionnementAutomatique(idx);
         },
         
         diminuerQuantite(idx) {
             if (this.panier[idx].quantite > 1) {
                 this.panier[idx].quantite--;
+                this.appliquerConditionnementAutomatique(idx);
             }
         },
         
         majQuantite(idx) {
             if (this.panier[idx].quantite < 1) this.panier[idx].quantite = 1;
+            this.appliquerConditionnementAutomatique(idx);
         },
         
         majRemise(idx) {
             if (this.panier[idx].remise < 0) this.panier[idx].remise = 0;
             
             // La remise ne doit pas dépasser le total de la ligne
-            const totalLigne = this.panier[idx].prix_vente * this.panier[idx].quantite;
+            const prixUnitaire = this.panier[idx].prix_promo < this.panier[idx].prix_vente ? 
+                this.panier[idx].prix_promo : this.panier[idx].prix_vente;
+            const totalLigne = prixUnitaire * this.panier[idx].quantite;
             if (this.panier[idx].remise > totalLigne) {
                 this.panier[idx].remise = totalLigne;
             }
@@ -390,96 +710,16 @@ document.addEventListener('alpine:init', () => {
             this.panier.splice(idx, 1);
         },
         
-        // Fonctions de scan de code-barre
+        // Fonctions de scan de code-barre (simplifiées pour scanner physique)
         setupBarcodeScanner() {
-            // Charger QuaggaJS si n'est pas encore chargé
-            if (typeof Quagga === 'undefined') {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js';
-                script.onload = () => this.initBarcodeScanner();
-                document.head.appendChild(script);
-            }
-        },
-        
-        startBarcodeScanning() {
-            this.barcodeScanning = true;
+            // Focus le champ de saisie du code-barres
             this.$nextTick(() => {
-                if (typeof Quagga !== 'undefined') {
-                    this.initBarcodeScanner();
-                } else {
-                    this.setupBarcodeScanner();
+                if (this.$refs.usbScan) {
+                    this.$refs.usbScan.focus();
+                    this.$refs.usbScan.select();
                 }
             });
         },
-        
-        initBarcodeScanner() {
-            if (!this.barcodeScanning) return;
-            
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#barcode-scanner'),
-                    constraints: {
-                        facingMode: "environment"
-                    }
-                },
-                decoder: {
-                    readers: [
-                        "ean_reader",
-                        "ean_8_reader",
-                        "code_39_reader",
-                        "code_128_reader"
-                    ]
-                }
-            }, (err) => {
-                if (err) {
-                    console.error("Erreur d'initialisation du scanner:", err);
-                    this.barcodeScanning = false;
-                    return;
-                }
-                
-                console.log("Scanner de code-barre actif");
-                
-                Quagga.start();
-                
-                Quagga.onDetected((result) => {
-                    if (result && result.codeResult) {
-                        const code = result.codeResult.code;
-                        this.lastScannedBarcode = code;
-                        console.log("Code-barre détecté:", code);
-                        
-                        // Rechercher le produit correspondant au code-barre
-                        const produit = this.produits.find(p => p.code_barre == code);
-                        if (produit) {
-                            this.selectionnerProduit(produit);
-                            
-                            // Feedback visuel et sonore
-                            const audioFeedback = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV');
-                            audioFeedback.play().catch(e => console.error("Erreur audio:", e));
-                            
-                            // Vibration si disponible
-                            if (navigator.vibrate) {
-                                navigator.vibrate(100);
-                            }
-                        } else {
-                            console.log("Aucun produit avec ce code-barre:", code);
-                            this.erreur = `Aucun produit avec le code-barre ${code}`;
-                            setTimeout(() => { this.erreur = ''; }, 3000);
-                        }
-                    }
-                });
-            });
-        },
-        
-        stopBarcodeScanning() {
-            if (typeof Quagga !== 'undefined') {
-                Quagga.stop();
-                this.barcodeScanning = false;
-            }
-        },
-        
-        scanHistory: [],
 
         async submitVente() {
             // Validation rapide côté JS
@@ -532,11 +772,23 @@ document.addEventListener('alpine:init', () => {
                 });
                 const result = await response.json();
                 if (response.ok) {
+                    // Redirection automatique vers la fiche de la vente créée
+                    if (result && result.redirect) {
+                        window.location.href = result.redirect;
+                        return;
+                    }
+                    if (result && result.vente && result.vente.id) {
+                        window.location.href = `/ventes/${result.vente.id}`;
+                        return;
+                    }
+                    if (result && result.id) {
+                        window.location.href = `/ventes/${result.id}`;
+                        return;
+                    }
                     this.message = result.message || 'Vente enregistrée avec succès !';
                     this.panier = [];
                     this.montantPaye = 0;
                     this.modePaiement = '';
-                    // Redirection ou reset possible ici
                 } else {
                     this.erreur = result.message || 'Erreur lors de la validation de la vente.';
                 }
@@ -552,30 +804,243 @@ document.addEventListener('alpine:init', () => {
                 code = this.barcode.trim();
             }
             if (!code) return;
-            const produit = this.produits.find(p => p.code_barre && p.code_barre.toString() === code.toString());
+            
+            console.log('Code scanné:', code); // Debug
+            
+            // Recherche du produit avec plus de robustesse
+            const produit = this.produits.find(p => {
+                // Convertir en string et comparer de façon stricte
+                if (!p.code_barre) return false;
+                
+                // Essayer plusieurs formats possibles (avec/sans espaces ou tirets)
+                const scanCode = code.toString().replace(/[\s-]/g, '');
+                const dbCode = p.code_barre.toString().replace(/[\s-]/g, '');
+                
+                return dbCode === scanCode;
+            });
+            
             if (produit) {
-                this.selectionnerProduit(produit);
+                console.log('Produit trouvé:', produit.nom); // Debug
+                
+                // Vérifier si le produit est déjà dans le panier
+                const index = this.panier.findIndex(item => item.id === produit.id);
+                
+                if (index !== -1) {
+                    // Si oui, augmenter la quantité et vérifier si un conditionnement doit être appliqué
+                    this.panier[index].quantite++;
+                    this.appliquerConditionnementAutomatique(index);
+                } else {
+                    // Si non, ajouter le produit au panier avec des informations de prix claires
+                    
+                    // 1. Déterminer le prix de base (prix normal unitaire)
+                    const prixBase = produit.prix_vente_ttc || produit.prix_vente || produit.prix || produit.pu || 0;
+                    
+                    // 2. Déterminer le prix promotionnel s'il existe
+                    const prixPromo = produit.prix_promo || prixBase;
+                    
+                    // 3. Créer l'objet produit pour le panier avec des noms explicites
+                    const produitPanier = {
+                        id: produit.id,
+                        nom: produit.nom,
+                        prix_unitaire_base: prixBase, // Prix unitaire de base (toujours conservé)
+                        prix_vente: prixBase,         // Prix de vente actuel (peut changer avec conditionnement)
+                        prix_promo: prixPromo,        // Prix promotionnel (si applicable)
+                        quantite: 1,
+                        remise: 0,
+                        conditionnements: produit.conditionnements || [],
+                        conditionnement_selectionne: null,
+                        conditionnement_auto: true,   // Activer l'application automatique des conditionnements
+                        promotion: produit.promotion,  // Informations sur la promotion active
+                        // Nouvelles propriétés pour plus de clarté
+                        a_promotion: prixPromo < prixBase,
+                        pourcentage_promo: prixPromo < prixBase ? Math.round((1 - prixPromo/prixBase) * 100) : 0
+                    };
+                    
+                    console.log('Ajout au panier:', {
+                        produit: produit.nom,
+                        prix_base: prixBase,
+                        prix_promo: prixPromo,
+                        a_promotion: produitPanier.a_promotion,
+                        reduction: produitPanier.pourcentage_promo + '%'
+                    });
+                    
+                    this.panier.push(produitPanier);
+                }
+                
                 this.barcode = '';
                 this.scanFeedback = 'ok';
                 this.scanHistory.push({ code, status: 'ok' });
                 // Bip audio court
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV');
+                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV');
                 audio.play().catch(()=>{});
-                setTimeout(() => { this.scanFeedback = null; }, 1000);
-                this.$nextTick(() => {
-                    this.$refs.usbScan && this.$refs.usbScan.focus();
-                    // Scroll auto vers le panier
-                    const panier = document.getElementById('panier-section');
-                    if (panier) panier.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                });
             } else {
+                console.log('Produit non trouvé pour le code:', code); // Debug
                 this.scanFeedback = 'nok';
                 this.scanHistory.push({ code, status: 'nok' });
-                setTimeout(() => { this.scanFeedback = null; }, 1000);
-                this.$nextTick(() => { this.$refs.usbScan && this.$refs.usbScan.focus(); });
+                this.erreur = `Aucun produit avec le code-barres ${code}`;
+                setTimeout(() => { this.erreur = ''; }, 3000);
             }
+            
+            // Toujours refocaliser le champ après traitement
+            setTimeout(() => {
+                this.scanFeedback = null;
+                this.barcode = '';
+                if (this.$refs.usbScan) {
+                    this.$refs.usbScan.focus();
+                    this.$refs.usbScan.select();
+                }
+            }, 800);
+            
             // Historique limité à 20
             if (this.scanHistory.length > 20) this.scanHistory = this.scanHistory.slice(-20);
+        },
+        
+        // Fonction améliorée pour appliquer automatiquement les conditionnements
+        appliquerConditionnementAutomatique(index) {
+            const item = this.panier[index];
+            
+            // Si l'application automatique des conditionnements n'est pas activée, ne rien faire
+            if (!item.conditionnement_auto) return;
+            
+            // Si le produit n'a pas de conditionnements, ne rien faire
+            if (!item.conditionnements || item.conditionnements.length === 0) return;
+            
+            console.log('Calcul conditionnement pour', item.nom, 'quantité:', item.quantite);
+            
+            // Trier les conditionnements par quantité décroissante pour appliquer d'abord les plus grands
+            const conditionnementsTries = [...item.conditionnements].sort((a, b) => b.quantite - a.quantite);
+            
+            // IMPORTANT: Sauvegarder le pourcentage de réduction promotionnelle
+            // Si le produit a une promotion active, on doit conserver le même pourcentage de réduction
+            const tauxPromotionOriginal = item.a_promotion ? item.pourcentage_promo / 100 : 0;
+            
+            // Réinitialiser le prix au prix unitaire de base
+            let prixUnitaire = item.prix_unitaire_base;
+            let nomProduit = item.nom.split(' - ')[0]; // Récupérer le nom de base du produit
+            
+            // Variables pour stocker les informations de conditionnement
+            let conditionnementApplique = null;
+            let detailConditionnement = '';
+            
+            // Calculer combien de conditionnements complets peuvent être appliqués
+            for (const cond of conditionnementsTries) {
+                if (item.quantite >= cond.quantite && item.quantite % cond.quantite === 0) {
+                    // Si la quantité est un multiple exact du conditionnement
+                    conditionnementApplique = cond;
+                    prixUnitaire = cond.prix / cond.quantite; // Prix par unité avec le conditionnement
+                    detailConditionnement = `${cond.type} (${cond.quantite})`;
+                    break;
+                }
+            }
+            
+            // Si aucun conditionnement exact n'est trouvé, appliquer le plus grand possible et laisser le reste en unitaire
+            if (!conditionnementApplique) {
+                for (const cond of conditionnementsTries) {
+                    if (item.quantite >= cond.quantite) {
+                        const nbConditionnements = Math.floor(item.quantite / cond.quantite);
+                        const nbUnites = item.quantite % cond.quantite;
+                        
+                        // Prix total = (prix du conditionnement × nb de conditionnements) + (prix unitaire × nb d'unités restantes)
+                        const prixTotal = (cond.prix * nbConditionnements) + (item.prix_unitaire_base * nbUnites);
+                        prixUnitaire = prixTotal / item.quantite; // Nouveau prix unitaire moyen
+                        
+                        conditionnementApplique = {
+                            ...cond,
+                            nbConditionnements,
+                            nbUnites
+                        };
+                        
+                        if (nbUnites > 0) {
+                            detailConditionnement = `${nbConditionnements}×${cond.type} + ${nbUnites} unité(s)`;
+                        } else {
+                            detailConditionnement = `${nbConditionnements}×${cond.type}`;
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Mettre à jour l'élément du panier
+            if (conditionnementApplique) {
+                item.conditionnement_selectionne = conditionnementApplique;
+                item.prix_vente = prixUnitaire;
+                item.nom = `${nomProduit} - ${detailConditionnement}`;
+                
+                // IMPORTANT: Appliquer la même réduction promotionnelle au nouveau prix conditionné
+                if (tauxPromotionOriginal > 0) {
+                    const reductionPromo = prixUnitaire * tauxPromotionOriginal;
+                    item.prix_promo = prixUnitaire - reductionPromo;
+                    item.a_promotion = true;
+                    item.pourcentage_promo = Math.round(tauxPromotionOriginal * 100);
+                } else {
+                    item.prix_promo = prixUnitaire;
+                    item.a_promotion = false;
+                    item.pourcentage_promo = 0;
+                }
+                
+                // Debug pour vérifier les calculs
+                console.log('Conditionnement appliqué:', {
+                    produit: item.nom,
+                    prixUnitaireBase: item.prix_unitaire_base,
+                    prixUnitaireConditionnement: prixUnitaire,
+                    tauxPromotionOriginal: tauxPromotionOriginal,
+                    prixPromotionnel: item.prix_promo,
+                    reductionEffective: tauxPromotionOriginal > 0 ? 
+                        `${item.pourcentage_promo}% (${this.formatPrix(prixUnitaire - item.prix_promo)} FCFA)` : 'Aucune'
+                });
+            } else {
+                // Si aucun conditionnement ne s'applique, revenir au prix unitaire de base
+                item.conditionnement_selectionne = null;
+                item.prix_vente = item.prix_unitaire_base;
+                item.nom = nomProduit;
+                
+                // Restaurer le prix promotionnel original si applicable
+                if (tauxPromotionOriginal > 0) {
+                    item.prix_promo = item.prix_unitaire_base * (1 - tauxPromotionOriginal);
+                } else {
+                    item.prix_promo = item.prix_unitaire_base;
+                }
+                
+                console.log('Aucun conditionnement applicable, retour au prix unitaire:', {
+                    produit: item.nom,
+                    prix: item.prix_vente,
+                    prixPromo: item.prix_promo
+                });
+            }
+        },
+
+        // Nouvelle fonction pour afficher les détails de calcul d'un produit
+        afficherDetailsCalcul(index) {
+            this.currentDetailIndex = index;
+            this.showCalculDetails = true;
+        },
+        
+        // Fonction pour obtenir les détails de calcul formatés
+        getDetailsCalcul(item) {
+            if (!item) return {};
+            
+            const details = {
+                nom: item.nom.split(' - ')[0],
+                quantite: item.quantite,
+                prixUnitaireBase: this.formatPrix(item.prix_unitaire_base),
+                prixUnitaireActuel: this.formatPrix(item.prix_vente),
+                prixUnitaireFinal: this.formatPrix(item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente),
+                totalAvantRemise: this.formatPrix((item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente) * item.quantite),
+                totalApresRemise: this.formatPrix(((item.prix_promo < item.prix_vente ? item.prix_promo : item.prix_vente) * item.quantite) - (item.remise || 0)),
+                remise: this.formatPrix(item.remise || 0),
+                aPromotion: item.prix_promo < item.prix_vente,
+                montantPromotion: item.prix_promo < item.prix_vente ? this.formatPrix((item.prix_vente - item.prix_promo) * item.quantite) : '0',
+                pourcentagePromotion: item.prix_promo < item.prix_vente ? Math.round((1 - item.prix_promo/item.prix_vente) * 100) + '%' : '0%',
+                aConditionnement: !!item.conditionnement_selectionne,
+                detailsConditionnement: item.conditionnement_selectionne ? {
+                    type: item.conditionnement_selectionne.type,
+                    quantite: item.conditionnement_selectionne.quantite,
+                    prix: this.formatPrix(item.conditionnement_selectionne.prix),
+                    economie: this.formatPrix(item.prix_unitaire_base * item.conditionnement_selectionne.quantite - item.conditionnement_selectionne.prix)
+                } : null
+            };
+            
+            return details;
         },
     }));
 });

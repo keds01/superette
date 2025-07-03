@@ -3,165 +3,120 @@
 @section('content')
 <div class="py-12">
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-semibold text-gray-900">Rapport quotidien d'audit</h1>
+        <!-- Header moderne -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10 animate-fade-in-down">
             <div>
-                <button id="print-report" class="btn-secondary mr-2">
-                    <i class="fas fa-print mr-2"></i>Imprimer
+                <h1 class="text-4xl font-extrabold bg-gradient-to-tr from-indigo-600 via-blue-500 to-purple-600 bg-clip-text text-transparent tracking-tight drop-shadow-lg">Rapport quotidien d'audit</h1>
+                <p class="mt-2 text-lg text-gray-500">Vue synthétique et détaillée de l'activité de la journée.</p>
+            </div>
+            <div class="flex flex-wrap gap-4">
+                <a href="{{ route('audit.index') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-blue-500 to-teal-400 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                    <i class="fas fa-arrow-left"></i> Retour au tableau de bord
+                </a>
+                <button id="print-report" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-gray-400 to-indigo-400 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                    <i class="fas fa-print"></i> Imprimer
                 </button>
-                <a href="{{ route('audit.rapport-quotidien', ['format' => 'pdf']) }}" class="btn-primary">
-                    <i class="fas fa-file-pdf mr-2"></i>Exporter PDF
+                <a href="{{ route('audit.rapport-quotidien', array_merge(request()->query(), ['format' => 'pdf'])) }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                    <i class="fas fa-file-pdf"></i> Exporter PDF
                 </a>
             </div>
         </div>
-        
-        <!-- Date picker -->
-        <div class="bg-white rounded-lg shadow mb-6">
-            <div class="p-6">
-                <form action="{{ route('audit.rapport-quotidien') }}" method="GET" class="flex items-center space-x-4">
-                    <div class="w-64">
-                        <label for="date" class="block text-sm font-medium text-gray-700">Date du rapport</label>
-                        <input type="date" name="date" id="date" value="{{ request('date', now()->format('Y-m-d')) }}"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div class="pt-5">
-                        <button type="submit" class="btn-primary">
-                            Générer
-                        </button>
-                    </div>
-                </form>
-            </div>
+
+        <!-- Filtres / Sélecteur de date -->
+        <div class="bg-white/60 backdrop-blur-xl border border-indigo-100 rounded-2xl shadow-2xl p-6 mb-8">
+            <form action="{{ route('audit.rapport-quotidien') }}" method="GET" class="flex flex-wrap gap-4 items-end">
+                <div class="w-64">
+                    <label for="date" class="block text-sm font-medium text-indigo-700">Date du rapport</label>
+                    <input type="date" name="date" id="date" value="{{ request('date', now()->format('Y-m-d')) }}"
+                           class="mt-1 block w-full rounded-xl border-indigo-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                </div>
+                <div>
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors">Générer</button>
+                </div>
+            </form>
         </div>
-        
-        <div id="printable-report">
+
+        @php
+            $aucuneDonnee = (
+                ($rapportQuotidien['ventes']['total'] ?? 0) === 0 &&
+                ($rapportQuotidien['paiements']['total'] ?? 0) === 0 &&
+                ($rapportQuotidien['activites']['total'] ?? 0) === 0 &&
+                ($rapportQuotidien['anomalies']['total'] ?? 0) === 0 &&
+                (count($rapportQuotidien['produits']['top_vendus'] ?? []) === 0)
+            );
+        @endphp
+        @if($aucuneDonnee)
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 mb-8 rounded-xl shadow">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-yellow-400 text-2xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-yellow-800">Aucune donnée pour cette journée</h3>
+                        <div class="mt-2 text-sm text-yellow-700">
+                            <p>Aucune vente, paiement, activité ou anomalie n'a été enregistrée pour la date sélectionnée.</p>
+                            <p>Essayez de choisir une autre date ou d'effectuer des opérations dans le système pour générer des données.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <div id="printable-report" @if($aucuneDonnee) style="display:none;" @endif>
             <!-- En-tête du rapport -->
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-                <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
-                    <div>
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">Rapport d'activité du {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-500">Généré le {{ now()->format('d/m/Y à H:i') }}</p>
-                    </div>
-                    <div>
-                        <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            {{ $rapportQuotidien['ventes']['montant_total'] > $rapportQuotidien['objectif_journalier'] ? 'Objectif atteint' : 'Objectif non atteint' }}
-                        </span>
-                    </div>
+            <div class="bg-white/60 backdrop-blur-xl border border-indigo-100 rounded-2xl shadow-2xl mb-8 p-6 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h3 class="text-2xl font-bold text-indigo-800">Rapport d'activité du {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</h3>
+                    <p class="mt-1 text-sm text-gray-500">Généré le {{ now()->format('d/m/Y à H:i') }}</p>
+                </div>
+                <div>
+                    <span class="px-4 py-2 inline-flex text-base leading-5 font-semibold rounded-full {{ $rapportQuotidien['ventes']['montant_total'] > $rapportQuotidien['objectif_journalier'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                        {{ $rapportQuotidien['ventes']['montant_total'] > $rapportQuotidien['objectif_journalier'] ? 'Objectif atteint' : 'Objectif non atteint' }}
+                    </span>
                 </div>
             </div>
-            
-            <!-- Résumé des ventes -->
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">Résumé des ventes</h3>
+
+            <!-- Résumé des ventes sous forme de cartes -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-gradient-to-tr from-indigo-50 to-blue-100 border border-indigo-200 rounded-2xl shadow-xl p-6 flex flex-col items-center">
+                    <div class="text-sm text-indigo-700 font-medium">Nombre de ventes</div>
+                    <div class="text-3xl font-extrabold text-indigo-900 mt-2">{{ $rapportQuotidien['ventes']['total'] }}</div>
                 </div>
-                <div class="border-t border-gray-200">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
-                        <div class="bg-gray-50 overflow-hidden shadow rounded-lg">
-                            <div class="px-4 py-5 sm:p-6">
-                                <dt class="text-sm font-medium text-gray-500 truncate">Nombre de ventes</dt>
-                                <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ $rapportQuotidien['ventes']['total'] }}</dd>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-gray-50 overflow-hidden shadow rounded-lg">
-                            <div class="px-4 py-5 sm:p-6">
-                                <dt class="text-sm font-medium text-gray-500 truncate">Chiffre d'affaires</dt>
-                                <dd class="mt-1 text-3xl font-semibold text-green-600">
-                                    {{ number_format($rapportQuotidien['ventes']['montant_total'], 0, ',', ' ') }} FCFA
-                                </dd>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-gray-50 overflow-hidden shadow rounded-lg">
-                            <div class="px-4 py-5 sm:p-6">
-                                <dt class="text-sm font-medium text-gray-500 truncate">Panier moyen</dt>
-                                <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                                    {{ number_format($rapportQuotidien['ventes']['panier_moyen'], 0, ',', ' ') }} FCFA
-                                </dd>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-gray-50 overflow-hidden shadow rounded-lg">
-                            <div class="px-4 py-5 sm:p-6">
-                                <dt class="text-sm font-medium text-gray-500 truncate">Ventes annulées</dt>
-                                <dd class="mt-1 text-3xl font-semibold text-red-600">
-                                    {{ $rapportQuotidien['ventes']['annulees']['total'] }}
-                                </dd>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Graphique des ventes par heure -->
-                    <div class="px-6 py-4">
-                        <h4 class="text-base font-medium text-gray-900 mb-4">Répartition des ventes par heure</h4>
-                        <div class="h-64">
-                            <canvas id="salesChart"></canvas>
-                        </div>
-                    </div>
+                <div class="bg-gradient-to-tr from-green-50 to-green-100 border border-green-200 rounded-2xl shadow-xl p-6 flex flex-col items-center">
+                    <div class="text-sm text-green-700 font-medium">Chiffre d'affaires</div>
+                    <div class="text-3xl font-extrabold text-green-900 mt-2">{{ number_format($rapportQuotidien['ventes']['montant_total'], 0, ',', ' ') }} FCFA</div>
+                </div>
+                <div class="bg-gradient-to-tr from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl shadow-xl p-6 flex flex-col items-center">
+                    <div class="text-sm text-yellow-700 font-medium">Panier moyen</div>
+                    <div class="text-3xl font-extrabold text-yellow-900 mt-2">{{ number_format($rapportQuotidien['ventes']['panier_moyen'], 0, ',', ' ') }} FCFA</div>
                 </div>
             </div>
-            
-            <!-- Détail des paiements -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Méthodes de paiement -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">Méthodes de paiement</h3>
-                    </div>
-                    <div class="p-6">
-                        <div class="h-64">
-                            <canvas id="paymentMethodsChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="px-6 pb-6">
-                        <div class="mt-4">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead>
-                                    <tr>
-                                        <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Méthode</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Transactions</th>
-                                        <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($rapportQuotidien['paiements']['par_methode'] as $methode => $data)
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ ucfirst($methode) }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $data['count'] }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ number_format($data['total'], 0, ',', ' ') }} FCFA</td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ $rapportQuotidien['paiements']['total_transactions'] }}</th>
-                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ number_format($rapportQuotidien['paiements']['total_montant'], 0, ',', ' ') }} FCFA</th>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
+
+            <!-- Graphique des ventes par heure -->
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
+                <h4 class="text-lg font-bold text-indigo-700 mb-4">Répartition des ventes par heure</h4>
+                <div class="h-64">
+                    <canvas id="salesChart"></canvas>
                 </div>
-                
-                <!-- Top produits vendus -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">Top produits vendus</h3>
-                    </div>
+            </div>
+
+            <!-- Top produits vendus -->
+            <div class="grid grid-cols-1 gap-8 mb-8">
+                <div class="bg-white rounded-2xl shadow-xl p-6">
+                    <h3 class="text-lg font-bold text-indigo-700 mb-4">Top produits vendus</h3>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead>
+                        <table class="min-w-full divide-y divide-indigo-100">
+                            <thead class="bg-indigo-50">
                                 <tr>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produit</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantité</th>
-                                    <th class="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Produit</th>
+                                    <th class="px-6 py-3 text-right text-xs font-bold text-indigo-700 uppercase tracking-wider">Quantité</th>
+                                    <th class="px-6 py-3 text-right text-xs font-bold text-indigo-700 uppercase tracking-wider">Montant</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
+                            <tbody class="bg-white divide-y divide-indigo-50">
                                 @foreach($rapportQuotidien['produits']['top_vendus'] as $produit)
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $produit['nom'] }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-900">{{ $produit['nom'] }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $produit['quantite'] }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ number_format($produit['montant'], 0, ',', ' ') }} FCFA</td>
                                 </tr>
@@ -176,107 +131,54 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Activités et anomalies -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 <!-- Activités -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">Activités enregistrées</h3>
-                    </div>
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <p class="text-sm text-gray-700">Total: <span class="font-medium">{{ $rapportQuotidien['activites']['total'] }}</span> activités</p>
-                            <a href="{{ route('audit.journal', ['date_debut' => $date, 'date_fin' => $date]) }}" class="text-sm text-indigo-600 hover:text-indigo-900">
-                                Voir le détail
-                            </a>
-                        </div>
-                        
-                        <div class="h-64">
-                            <canvas id="activitiesChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Anomalies -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex justify-between items-center">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">Anomalies détectées</h3>
-                        <a href="{{ route('audit.anomalies', ['date_debut' => $date, 'date_fin' => $date]) }}" class="text-sm text-indigo-600 hover:text-indigo-900">
-                            Voir tout
+                <div class="bg-white rounded-2xl shadow-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-indigo-700">Activités enregistrées</h3>
+                        <a href="{{ route('audit.journal', ['date_debut' => $date, 'date_fin' => $date]) }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-indigo-100 text-indigo-700 text-xs font-semibold shadow hover:bg-indigo-200 transition">
+                            <i class="fas fa-list"></i> Voir le détail
                         </a>
                     </div>
-                    <div class="overflow-hidden">
-                        <ul class="divide-y divide-gray-200">
-                            @forelse($rapportQuotidien['anomalies'] as $anomalie)
-                            <li>
-                                <a href="{{ route('audit.detail-anomalie', ['id' => $anomalie['id']]) }}" class="block hover:bg-gray-50">
-                                    <div class="px-4 py-4 sm:px-6">
-                                        <div class="flex items-center justify-between">
-                                            <p class="text-sm font-medium text-indigo-600 truncate">
-                                                {{ ucfirst(str_replace('_', ' ', $anomalie['type'])) }}
-                                            </p>
-                                            <div class="ml-2 flex-shrink-0 flex">
-                                                <p class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                {{ $anomalie['severite'] === 'haute' ? 'bg-red-100 text-red-800' : 
-                                                  ($anomalie['severite'] === 'moyenne' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
-                                                    {{ ucfirst($anomalie['severite']) }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div class="mt-2 sm:flex sm:justify-between">
-                                            <div class="sm:flex">
-                                                <p class="flex items-center text-sm text-gray-500">
-                                                    {{ $anomalie['message'] }}
-                                                </p>
-                                            </div>
-                                            <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                                <p>
-                                                    {{ \Carbon\Carbon::parse($anomalie['created_at'])->format('H:i') }}
-                                                </p>
-                                            </div>
-                                        </div>
+                    <div class="h-64">
+                        <canvas id="activitiesChart"></canvas>
+                    </div>
+                </div>
+                <!-- Anomalies -->
+                <div class="bg-white rounded-2xl shadow-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-red-700">Anomalies détectées</h3>
+                        <a href="{{ route('audit.anomalies', ['date_debut' => $date, 'date_fin' => $date]) }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-red-100 text-red-700 text-xs font-semibold shadow hover:bg-red-200 transition">
+                            <i class="fas fa-bug"></i> Voir tout
+                        </a>
+                    </div>
+                    <ul class="divide-y divide-red-100">
+                        @forelse(is_array($rapportQuotidien['anomalies']['liste']) ? $rapportQuotidien['anomalies']['liste'] : [] as $anomalie)
+                        <li>
+                            <a href="{{ route('audit.detail-anomalie', ['id' => $anomalie['id']]) }}" class="block hover:bg-red-50 px-4 py-4 rounded transition">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm font-medium text-red-700 truncate">
+                                        {{ ucfirst(str_replace('_', ' ', $anomalie['type'])) }}
+                                    </p>
+                                    <div class="ml-2 flex-shrink-0 flex">
+                                        <p class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {{ $anomalie['severite'] === 'haute' ? 'bg-red-100 text-red-800' : 
+                                          ($anomalie['severite'] === 'moyenne' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800') }}">
+                                            {{ ucfirst($anomalie['severite']) }}
+                                        </p>
                                     </div>
-                                </a>
-                            </li>
-                            @empty
-                            <li class="px-4 py-6 text-center text-sm text-gray-500">
-                                Aucune anomalie détectée pour cette journée
-                            </li>
-                            @endforelse
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Conclusion et recommandations -->
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">Résumé et recommandations</h3>
-                </div>
-                <div class="px-4 py-5 sm:p-6">
-                    <div class="prose max-w-none">
-                        <p>Résumé de la journée du {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }} :</p>
-                        <ul>
-                            <li>Chiffre d'affaires: <strong>{{ number_format($rapportQuotidien['ventes']['montant_total'], 0, ',', ' ') }} FCFA</strong> 
-                                ({{ $rapportQuotidien['ventes']['montant_total'] > $rapportQuotidien['objectif_journalier'] ? 'Au-dessus' : 'En-dessous' }} de l'objectif 
-                                de {{ number_format($rapportQuotidien['objectif_journalier'], 0, ',', ' ') }} FCFA)</li>
-                            <li>{{ $rapportQuotidien['ventes']['total'] }} ventes enregistrées avec un panier moyen de 
-                                {{ number_format($rapportQuotidien['ventes']['panier_moyen'], 0, ',', ' ') }} FCFA</li>
-                            <li>{{ $rapportQuotidien['ventes']['annulees']['total'] }} ventes annulées pour un montant de 
-                                {{ number_format($rapportQuotidien['ventes']['annulees']['montant_total'], 0, ',', ' ') }} FCFA</li>
-                            <li>{{ count($rapportQuotidien['anomalies']) }} anomalies détectées</li>
-                        </ul>
-                        
-                        @if(count($rapportQuotidien['recommandations']) > 0)
-                        <p>Recommandations :</p>
-                        <ul>
-                            @foreach($rapportQuotidien['recommandations'] as $recommandation)
-                            <li>{{ $recommandation }}</li>
-                            @endforeach
-                        </ul>
-                        @endif
-                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-500">{{ $anomalie['description'] ?? '' }}</div>
+                            </a>
+                        </li>
+                        @empty
+                        <li>
+                            <div class="px-4 py-4 text-center text-sm text-gray-500">Aucune anomalie détectée</div>
+                        </li>
+                        @endforelse
+                    </ul>
                 </div>
             </div>
         </div>
@@ -284,148 +186,116 @@
 </div>
 @endsection
 
-@section('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+@push('scripts')
 <script>
+    // Impression du rapport
+    document.getElementById('print-report').addEventListener('click', function() {
+        window.print();
+    });
+
+    // Initialisation des graphiques avec Chart.js
     document.addEventListener('DOMContentLoaded', function() {
-        // Configuration des graphiques
-        const salesChartCtx = document.getElementById('salesChart').getContext('2d');
-        const paymentMethodsChartCtx = document.getElementById('paymentMethodsChart').getContext('2d');
-        const activitiesChartCtx = document.getElementById('activitiesChart').getContext('2d');
-        
-        // Données pour le graphique des ventes par heure
-        const salesChart = new Chart(salesChartCtx, {
-            type: 'bar',
-            data: {
-                labels: {!! json_encode(array_keys($rapportQuotidien['ventes']['par_heure'])) !!},
-                datasets: [{
-                    label: 'Nombre de ventes',
-                    data: {!! json_encode(array_column($rapportQuotidien['ventes']['par_heure'], 'count')) !!},
-                    backgroundColor: 'rgba(79, 70, 229, 0.2)',
-                    borderColor: 'rgba(79, 70, 229, 1)',
-                    borderWidth: 1
-                }, {
-                    label: 'Montant (FCFA / 1000)',
-                    data: {!! json_encode(array_map(function($item) { return $item['montant'] / 1000; }, $rapportQuotidien['ventes']['par_heure'])) !!},
-                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                    borderColor: 'rgba(16, 185, 129, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y1'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Nombre de ventes'
-                        }
-                    },
-                    y1: {
-                        beginAtZero: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Montant (FCFA / 1000)'
+        // Graphique des ventes par heure
+        const salesChartCtx = document.getElementById('salesChart');
+        if (salesChartCtx) {
+            const heures = @json(array_keys($rapportQuotidien['ventes']['par_heure']));
+            const ventesCount = @json(array_column($rapportQuotidien['ventes']['par_heure'], 'count'));
+            const ventesMontant = @json(array_column($rapportQuotidien['ventes']['par_heure'], 'montant'));
+            
+            new Chart(salesChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: heures.map(h => `${h}h`),
+                    datasets: [
+                        {
+                            label: 'Nombre de ventes',
+                            data: ventesCount,
+                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                            borderColor: 'rgb(79, 70, 229)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
                         },
-                        grid: {
-                            drawOnChartArea: false
+                        {
+                            label: 'Montant (FCFA)',
+                            data: ventesMontant,
+                            type: 'line',
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: 'rgb(5, 150, 105)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            yAxisID: 'y1'
                         }
-                    }
-                }
-            }
-        });
-        
-        // Données pour le graphique des méthodes de paiement
-        const paymentMethods = {!! json_encode(array_keys($rapportQuotidien['paiements']['par_methode'])) !!};
-        const paymentAmounts = {!! json_encode(array_column($rapportQuotidien['paiements']['par_methode'], 'total')) !!};
-        const paymentCounts = {!! json_encode(array_column($rapportQuotidien['paiements']['par_methode'], 'count')) !!};
-        
-        const backgroundColors = [
-            'rgba(79, 70, 229, 0.6)',
-            'rgba(16, 185, 129, 0.6)',
-            'rgba(245, 158, 11, 0.6)',
-            'rgba(239, 68, 68, 0.6)',
-            'rgba(107, 114, 128, 0.6)'
-        ];
-        
-        const paymentMethodsChart = new Chart(paymentMethodsChartCtx, {
-            type: 'pie',
-            data: {
-                labels: paymentMethods.map(method => method.charAt(0).toUpperCase() + method.slice(1)),
-                datasets: [{
-                    data: paymentAmounts,
-                    backgroundColor: backgroundColors.slice(0, paymentMethods.length),
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed || 0;
-                                const count = paymentCounts[context.dataIndex];
-                                const total = paymentAmounts.reduce((a, b) => a + b, 0);
-                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                                return `${label}: ${new Intl.NumberFormat('fr-FR').format(value)} FCFA (${percentage}%) - ${count} transaction(s)`;
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Nombre de ventes'
+                            },
+                            ticks: {
+                                precision: 0
+                            }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Montant (FCFA)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
                             }
                         }
                     }
                 }
-            }
-        });
-        
-        // Données pour le graphique des activités
-        const activitiesChart = new Chart(activitiesChartCtx, {
-            type: 'doughnut',
-            data: {
-                labels: {!! json_encode(array_keys($rapportQuotidien['activites']['par_type'])) !!}.map(type => type.charAt(0).toUpperCase() + type.slice(1)),
-                datasets: [{
-                    data: {!! json_encode(array_values($rapportQuotidien['activites']['par_type'])) !!},
-                    backgroundColor: backgroundColors,
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
+            });
+        }
+
+        // Graphique des activités
+        const activitiesChartCtx = document.getElementById('activitiesChart');
+        if (activitiesChartCtx) {
+            const types = @json(array_keys($rapportQuotidien['activites']['par_type'] ?? []));
+            const counts = @json(array_values($rapportQuotidien['activites']['par_type'] ?? []));
+            
+            new Chart(activitiesChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: types.map(t => t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')),
+                    datasets: [{
+                        label: 'Nombre d\'activités',
+                        data: counts,
+                        backgroundColor: 'rgba(139, 92, 246, 0.7)',
+                        borderColor: 'rgb(124, 58, 237)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
                     }
                 }
-            }
-        });
-        
-        // Gestion de l'impression
-        document.getElementById('print-report').addEventListener('click', function() {
-            const printContents = document.getElementById('printable-report').innerHTML;
-            const originalContents = document.body.innerHTML;
-            
-            document.body.innerHTML = `
-                <div class="p-8">
-                    <div class="text-center mb-8">
-                        <h1 class="text-2xl font-bold">Rapport d'audit quotidien</h1>
-                        <p>Superette - {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</p>
-                    </div>
-                    ${printContents}
-                </div>
-            `;
-            
-            window.print();
-            document.body.innerHTML = originalContents;
-            window.location.reload();
-        });
+            });
+        }
     });
 </script>
-@endsection
+@endpush

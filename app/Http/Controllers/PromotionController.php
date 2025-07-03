@@ -111,6 +111,20 @@ class PromotionController extends Controller
             'actif' => 'boolean'
         ]);
 
+        // Ajouter automatiquement la superette active
+        // Utiliser active_superette_id qui est défini par le middleware CheckSuperetteSelected
+        $validated['superette_id'] = session('active_superette_id');
+        
+        // Si pour une raison quelconque la superette_id n'est pas dans la session, utiliser celle de l'utilisateur
+        if (!$validated['superette_id'] && auth()->check() && auth()->user()->superette_id) {
+            $validated['superette_id'] = auth()->user()->superette_id;
+        }
+        
+        // Si toujours pas de superette_id, utiliser la superette par défaut (ID 1)
+        if (!$validated['superette_id']) {
+            $validated['superette_id'] = 1; // Superette par défaut
+        }
+
         $promotion = Promotion::create($validated);
 
         return redirect()
@@ -149,6 +163,23 @@ class PromotionController extends Controller
             'description' => 'nullable|string|max:500',
             'actif' => 'boolean'
         ]);
+
+        // S'assurer que la superette_id reste celle de la promotion existante
+        // ou utiliser celle de la session si la promotion n'en a pas
+        if (!$promotion->superette_id) {
+            // Utiliser active_superette_id qui est défini par le middleware CheckSuperetteSelected
+            $validated['superette_id'] = session('active_superette_id');
+            
+            // Si pour une raison quelconque la superette_id n'est pas dans la session, utiliser celle de l'utilisateur
+            if (!$validated['superette_id'] && auth()->check() && auth()->user()->superette_id) {
+                $validated['superette_id'] = auth()->user()->superette_id;
+            }
+            
+            // Si toujours pas de superette_id, utiliser la superette par défaut (ID 1)
+            if (!$validated['superette_id']) {
+                $validated['superette_id'] = 1; // Superette par défaut
+            }
+        }
 
         $promotion->update($validated);
 

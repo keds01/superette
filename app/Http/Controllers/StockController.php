@@ -22,6 +22,10 @@ class StockController extends Controller
     
     public function index(Request $request)
     {
+        $activeSuperetteId = activeSuperetteId();
+        $activeSuperette = activeSuperette();
+
+        // Si aucune superette active n'est sélectionnée, afficher tous les produits sans superette_id
         $query = Produit::with([
             'categorie',
             'uniteVente',
@@ -63,15 +67,34 @@ class StockController extends Controller
         // Récupération des catégories pour le filtre
         $categories = Categorie::orderBy('nom')->get();
         
-        // Statistiques globales
-        $totalProducts = Produit::count();
-        $stockValue = Produit::sum(DB::raw('stock * prix_achat_ht'));
-        $lowStockCount = Produit::whereRaw('stock <= seuil_alerte')->count();
-        $expiringCount = Produit::whereNotNull('date_peremption')
-            ->where('date_peremption', '<=', now()->addDays(15))
-            ->where('date_peremption', '>', now())
-            ->count();
-        
+        if ($activeSuperetteId) {
+            // Afficher uniquement les produits de la superette active
+            $query->where('superette_id', $activeSuperetteId);
+            
+            // Statistiques globales pour la superette active
+            $totalProducts = Produit::where('superette_id', $activeSuperetteId)->count();
+            $stockValue = Produit::where('superette_id', $activeSuperetteId)->sum(DB::raw('stock * prix_achat_ht'));
+            $lowStockCount = Produit::where('superette_id', $activeSuperetteId)->whereRaw('stock <= seuil_alerte')->count();
+            $expiringCount = Produit::where('superette_id', $activeSuperetteId)
+                ->whereNotNull('date_peremption')
+                ->where('date_peremption', '<=', now()->addDays(15))
+                ->where('date_peremption', '>', now())
+                ->count();
+        } else {
+            // Si aucune superette n'est sélectionnée, afficher les produits sans superette_id
+            $query->whereNull('superette_id');
+            
+            // Statistiques globales pour les produits sans superette
+            $totalProducts = Produit::whereNull('superette_id')->count();
+            $stockValue = Produit::whereNull('superette_id')->sum(DB::raw('stock * prix_achat_ht'));
+            $lowStockCount = Produit::whereNull('superette_id')->whereRaw('stock <= seuil_alerte')->count();
+            $expiringCount = Produit::whereNull('superette_id')
+                ->whereNotNull('date_peremption')
+                ->where('date_peremption', '<=', now()->addDays(15))
+                ->where('date_peremption', '>', now())
+                ->count();
+        }
+
         $products = $query->latest()->paginate(10)->withQueryString();
 
         return view('stocks.index', compact(
@@ -80,7 +103,8 @@ class StockController extends Controller
             'totalProducts',
             'stockValue',
             'lowStockCount',
-            'expiringCount'
+            'expiringCount',
+            'activeSuperette'
         ));
     }
     

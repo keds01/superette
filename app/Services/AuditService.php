@@ -37,7 +37,8 @@ class AuditService
             'model_id' => $model_id,
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'metadata' => json_encode($metadata)
+            'metadata' => json_encode($metadata),
+            'superette_id' => session('active_superette_id') ?? $user->superette_id
         ]);
         
         $activityLog->save();
@@ -54,14 +55,17 @@ class AuditService
     {
         $anomalies = [];
         
+        // Récupérer la supérette active
+        $superetteId = session('active_superette_id');
+        
         // 1. Variations de prix >10% en 24h
-        $this->detecterVariationsPrix($anomalies);
+        $this->detecterVariationsPrix($anomalies, $superetteId);
         
         // 2. Séries d'annulations suspectes
-        $this->detecterAnnulationsSuspectes($anomalies);
+        $this->detecterAnnulationsSuspectes($anomalies, $superetteId);
         
         // 3. Ajustements de stock massifs (>20%)
-        $this->detecterAjustementsStockMassifs($anomalies);
+        $this->detecterAjustementsStockMassifs($anomalies, $superetteId);
         
         return $anomalies;
     }
@@ -71,14 +75,21 @@ class AuditService
      * 
      * @param array &$anomalies Tableau d'anomalies à compléter
      */
-    private function detecterVariationsPrix(&$anomalies)
+    private function detecterVariationsPrix(&$anomalies, $superetteId)
     {
         // Récupérer les produits dont le prix a changé récemment
         $hier = Carbon::now()->subDay();
-        $produits = Produit::whereHas('mouvementsStock', function ($query) use ($hier) {
+        $query = Produit::whereHas('mouvementsStock', function ($query) use ($hier) {
             $query->where('created_at', '>=', $hier)
                 ->where('type', 'like', '%ajustement%');
-        })->get();
+        });
+        
+        // Filtrer par supérette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
+        
+        $produits = $query->get();
         
         foreach ($produits as $produit) {
             // Récupérer l'historique des prix
@@ -121,14 +132,20 @@ class AuditService
      * 
      * @param array &$anomalies Tableau d'anomalies à compléter
      */
-    private function detecterAnnulationsSuspectes(&$anomalies)
+    private function detecterAnnulationsSuspectes(&$anomalies, $superetteId)
     {
         // Récupérer les annulations des dernières 24h, groupées par employé
         $hier = Carbon::now()->subDay();
         
-        $utilisateursAnnulations = Vente::where('statut', 'annulee')
-            ->where('updated_at', '>=', $hier)
-            ->select('employe_id', DB::raw('count(*) as nb_annulations'), DB::raw('sum(montant_total) as montant_total'))
+        $query = Vente::where('statut', 'annulee')
+            ->where('updated_at', '>=', $hier);
+            
+        // Filtrer par supérette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
+        
+        $utilisateursAnnulations = $query->select('employe_id', DB::raw('count(*) as nb_annulations'), DB::raw('sum(montant_total) as montant_total'))
             ->groupBy('employe_id')
             ->having('nb_annulations', '>=', 3) // Seuil de suspicion: 3 annulations ou plus
             ->get();
@@ -171,17 +188,23 @@ class AuditService
      * 
      * @param array &$anomalies Tableau d'anomalies à compléter
      */
-    private function detecterAjustementsStockMassifs(&$anomalies)
+    private function detecterAjustementsStockMassifs(&$anomalies, $superetteId)
     {
         // Récupérer les ajustements de stock des dernières 24h
         $hier = Carbon::now()->subDay();
         
-        $ajustements = MouvementStock::where(function ($query) {
+        $query = MouvementStock::where(function ($query) {
             $query->where('type', 'ajustement_positif')
                 ->orWhere('type', 'ajustement_negatif');
         })
-        ->where('created_at', '>=', $hier)
-        ->get();
+        ->where('created_at', '>=', $hier);
+        
+        // Filtrer par supérette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
+        
+        $ajustements = $query->get();
         
         foreach ($ajustements as $ajustement) {
             $produit = $ajustement->produit;
@@ -224,22 +247,43 @@ class AuditService
         $debut = $date->copy()->startOfDay();
         $fin = $date->copy()->endOfDay();
         
-        // Récupération des activités de la journée
-        $activites = \App\Models\ActivityLog::whereBetween('created_at', [$debut, $fin])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        // Récupération des activités de la journée (filtrées par supérette active)
+        $superetteId = session('active_superette_id');
+        $query = \App\Models\ActivityLog::whereBetween('created_at', [$debut, $fin])
+            ->orderBy('created_at', 'asc');
+            
+        // Si une supérette est sélectionnée, filtrer les activités par cette supérette
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
         
-        // Récupération des ventes de la journée
-        $ventes = Vente::whereBetween('date_vente', [$debut, $fin])->get();
-        $ventesAnnulees = $ventes->where('statut', 'annulé');
+        $activites = $query->get();
+        
+        // Récupération de toutes les ventes de la journée
+        $queryToutesVentes = Vente::whereBetween(DB::raw('COALESCE(date_vente, created_at)'), [$debut, $fin]);
+            
+        // Filtrer par supérette si spécifiée
+        if ($superetteId) {
+            $queryToutesVentes->where('superette_id', $superetteId);
+        }
+        
+        $toutesVentes = $queryToutesVentes->get();
+        
+        // Séparer les ventes valides et annulées
+        $ventesValides = $toutesVentes->whereIn('statut', ['completee', 'terminee']);
+        $ventesAnnulees = $toutesVentes->whereIn('statut', ['annulee', 'annulé']);
         
         // Récupération des paiements de la journée (avec gestion d'erreur si la table n'existe pas)
         try {
-            // Vérifier si la table existe
             if (Schema::hasTable('paiements')) {
-                $paiements = Paiement::whereBetween('date_paiement', [$debut, $fin])->get();
+                $query = Paiement::whereBetween(DB::raw('COALESCE(date_paiement, created_at)'), [$debut, $fin]);
                 
-                // Calcul des montants par méthode de paiement
+                // Filtrer par supérette si spécifiée
+                if ($superetteId) {
+                    $query->where('superette_id', $superetteId);
+                }
+                
+                $paiements = $query->get();
                 $montantsParMethode = $paiements->groupBy('methode')
                     ->map(function ($items) {
                         return [
@@ -252,18 +296,56 @@ class AuditService
                 $montantsParMethode = collect();
             }
         } catch (\Exception $e) {
-            // Si une erreur se produit, utiliser des collections vides
             $paiements = collect();
             $montantsParMethode = collect();
-            
-            // Logger l'erreur
             \Log::warning('Erreur lors de la récupération des paiements: ' . $e->getMessage());
         }
         
         // Détection des anomalies
         $anomalies = $this->detecterAnomalies();
         
-        // Structure du rapport
+        // Calcul des ventes par heure (uniquement les ventes valides)
+        $ventesParHeure = [];
+        foreach ($ventesValides as $vente) {
+            $heure = Carbon::parse($vente->date_vente ?? $vente->created_at)->format('H');
+            if (!isset($ventesParHeure[$heure])) {
+                $ventesParHeure[$heure] = ['count' => 0, 'montant' => 0];
+            }
+            $ventesParHeure[$heure]['count'] += 1;
+            $ventesParHeure[$heure]['montant'] += $vente->montant_total;
+        }
+        // S'assurer que toutes les heures de 0 à 23 sont présentes
+        for ($h = 0; $h < 24; $h++) {
+            $key = str_pad($h, 2, '0', STR_PAD_LEFT);
+            if (!isset($ventesParHeure[$key])) {
+                $ventesParHeure[$key] = ['count' => 0, 'montant' => 0];
+            }
+        }
+        ksort($ventesParHeure);
+        
+        // Top produits vendus (uniquement des ventes valides)
+        $topVendus = [];
+        if ($ventesValides->count() > 0 && Schema::hasTable('detail_ventes')) {
+            $topVendus = DB::table('detail_ventes')
+                ->join('produits', 'detail_ventes.produit_id', '=', 'produits.id')
+                ->join('ventes', 'detail_ventes.vente_id', '=', 'ventes.id')
+                ->whereBetween('ventes.created_at', [$debut, $fin])
+                ->whereIn('ventes.statut', ['completee', 'terminee']) // Uniquement les ventes valides
+                ->selectRaw('produits.nom, SUM(detail_ventes.quantite) as quantite, SUM(detail_ventes.sous_total) as montant')
+                ->groupBy('produits.nom')
+                ->orderByDesc('montant')
+                ->limit(10)
+                ->get()
+                ->map(function($item) {
+                    return [
+                        'nom' => $item->nom,
+                        'quantite' => $item->quantite,
+                        'montant' => $item->montant
+                    ];
+                })->toArray();
+        }
+        
+        // Structure du rapport (toutes les clés sont garanties)
         $rapport = [
             'date' => $date->format('Y-m-d'),
             'periode' => [
@@ -271,33 +353,39 @@ class AuditService
                 'fin' => $fin->format('Y-m-d H:i:s')
             ],
             'ventes' => [
-                'total' => $ventes->count(),
-                'montant_total' => $ventes->sum('montant_final'),
-                'panier_moyen' => $ventes->count() > 0 ? $ventes->sum('montant_final') / $ventes->count() : 0,
+                'total' => $ventesValides->count(), // Uniquement les ventes valides
+                'montant_total' => $ventesValides->sum('montant_total'), // Uniquement les ventes valides
+                'panier_moyen' => $ventesValides->count() > 0 ? $ventesValides->sum('montant_total') / $ventesValides->count() : 0,
                 'annulees' => [
                     'total' => $ventesAnnulees->count(),
-                    'montant_total' => $ventesAnnulees->sum('montant_final')
-                ]
+                    'montant_total' => $ventesAnnulees->sum('montant_total')
+                ],
+                'par_heure' => $ventesParHeure
             ],
             'paiements' => [
                 'total' => $paiements->count(),
                 'montant_total' => $paiements->sum('montant'),
-                'par_methode' => $montantsParMethode
+                'par_methode' => $montantsParMethode->toArray(),
+                'total_transactions' => $paiements->count(),
+                'total_montant' => $paiements->sum('montant')
             ],
             'activites' => [
                 'total' => $activites->count(),
-                'par_type' => $activites->groupBy('type')->map->count()
+                'par_type' => $activites->groupBy('type')->map->count()->toArray()
             ],
             'anomalies' => [
                 'total' => count($anomalies),
-                'par_severite' => collect($anomalies)->groupBy('severite')->map->count(),
+                'par_severite' => collect($anomalies)->groupBy('severite')->map->count()->toArray(),
                 'liste' => $anomalies
-            ]
+            ],
+            'objectif_journalier' => config('superette.objectif_journalier', 0),
+            'produits' => [
+                'top_vendus' => $topVendus
+            ],
+            'recommandations' => []
         ];
-        
         return $rapport;
     }
-    
     /**
      * Génère un rapport hebdomadaire d'audit
      * 
@@ -426,5 +514,136 @@ class AuditService
         } catch (\Exception $e) {
             Log::error('Erreur lors de la notification d\'anomalie: ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * Récupère les anomalies selon les filtres spécifiés
+     * 
+     * @param array $filtres Filtres à appliquer
+     * @return Collection Collection d'anomalies
+     */
+    public function getAnomalies($filtres = [])
+    {
+        // Récupération de toutes les anomalies
+        $anomalies = $this->detecterAnomalies();
+        
+        // Application des filtres
+        if (!empty($filtres)) {
+            $anomalies = collect($anomalies)->filter(function ($anomalie) use ($filtres) {
+                $match = true;
+                
+                // Filtre par type
+                if (!empty($filtres['type']) && $anomalie['type'] != $filtres['type']) {
+                    $match = false;
+                }
+                
+                // Filtre par sévérité
+                if (!empty($filtres['severite']) && $anomalie['severite'] != $filtres['severite']) {
+                    $match = false;
+                }
+                
+                // Filtre par statut
+                if (!empty($filtres['statut']) && (!isset($anomalie['statut']) || $anomalie['statut'] != $filtres['statut'])) {
+                    $match = false;
+                }
+                
+                // Filtre par date (à implémenter si nécessaire)
+                
+                // Filtre par superette_id
+                if (!empty($filtres['superette_id']) && 
+                    (!isset($anomalie['superette_id']) || $anomalie['superette_id'] != $filtres['superette_id'])) {
+                    $match = false;
+                }
+                
+                return $match;
+            })->values()->all();
+        }
+        
+        return $anomalies;
+    }
+    
+    /**
+     * Récupère une anomalie spécifique par son ID
+     * 
+     * @param int $id ID de l'anomalie
+     * @return array|null Données de l'anomalie ou null si non trouvée
+     */
+    public function getAnomalieById($id)
+    {
+        $anomalies = $this->detecterAnomalies();
+        
+        // Pour l'instant, on retourne la première anomalie trouvée
+        // Dans une implémentation réelle, les anomalies seraient stockées en base
+        return $anomalies[0] ?? null;
+    }
+    
+    /**
+     * Met à jour le statut d'une anomalie
+     * 
+     * @param int $id ID de l'anomalie
+     * @param string $statut Nouveau statut
+     * @return bool
+     */
+    public function updateAnomalieStatus($id, $statut)
+    {
+        // Pour l'instant, on simule la mise à jour
+        // Dans une implémentation réelle, on mettrait à jour en base
+        return true;
+    }
+    
+    /**
+     * Récupère les commentaires d'une anomalie
+     * 
+     * @param int $id ID de l'anomalie
+     * @return array
+     */
+    public function getCommentairesByAnomalieId($id)
+    {
+        // Pour l'instant, on retourne un tableau vide
+        // Dans une implémentation réelle, on récupérerait depuis la base
+        return [];
+    }
+    
+    /**
+     * Ajoute un commentaire à une anomalie
+     * 
+     * @param int $id ID de l'anomalie
+     * @param string $commentaire Contenu du commentaire
+     * @param int $userId ID de l'utilisateur
+     * @return bool
+     */
+    public function addCommentToAnomalie($id, $commentaire, $userId)
+    {
+        // Pour l'instant, on simule l'ajout
+        // Dans une implémentation réelle, on sauvegarderait en base
+        return true;
+    }
+    
+    /**
+     * Récupère les anomalies avec pagination
+     * 
+     * @param array $filtres Filtres à appliquer
+     * @param int $perPage Nombre d'éléments par page
+     * @return LengthAwarePaginator Paginator d'anomalies
+     */
+    public function getAnomaliesPaginated($filtres = [], $perPage = 15)
+    {
+        $anomalies = $this->getAnomalies($filtres);
+        
+        // Création d'une collection pour la pagination
+        $page = request()->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+        
+        // Récupération des éléments pour la page courante
+        $items = array_slice($anomalies, $offset, $perPage);
+        
+        // Création du paginator
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            count($anomalies),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
     }
 }

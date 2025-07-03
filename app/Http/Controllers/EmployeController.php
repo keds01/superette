@@ -15,7 +15,7 @@ class EmployeController extends Controller
      */
     public function index()
     {
-        $employes = User::with('roles')->paginate(10);
+        $employes = User::paginate(10);
         return view('employes.index', compact('employes'));
     }
 
@@ -37,7 +37,7 @@ class EmployeController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'role' => ['required', 'string', 'exists:roles,name']
+            'role' => ['required', 'string']
         ]);
 
         $user = User::create([
@@ -45,8 +45,6 @@ class EmployeController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
         ]);
-
-        $user->assignRole($validated['role']);
 
         return redirect()->route('employes.index')
             ->with('success', 'Employé créé avec succès.');
@@ -78,7 +76,7 @@ class EmployeController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $employe->id],
             'password' => ['nullable', 'confirmed', Password::defaults()],
-            'role' => ['required', 'string', 'exists:roles,name']
+            'role' => ['required', 'string']
         ]);
 
         $employe->update([
@@ -91,8 +89,6 @@ class EmployeController extends Controller
                 'password' => Hash::make($validated['password'])
             ]);
         }
-
-        $employe->syncRoles([$validated['role']]);
 
         return redirect()->route('employes.index')
             ->with('success', 'Employé mis à jour avec succès.');

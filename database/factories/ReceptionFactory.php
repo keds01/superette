@@ -20,9 +20,9 @@ class ReceptionFactory extends Factory
             'user_id' => User::inRandomOrder()->first()?->id ?? User::factory(),
             'date_reception' => $this->faker->dateTimeBetween('-1 year', 'now'),
             'numero_facture' => $this->faker->optional()->ean13,
-            'mode_paiement' => $this->faker->randomElement(['espece', 'cheque', 'virement', 'mobile_money']),
+            'mode_paiement' => $this->faker->randomElement(['especes', 'cheque', 'virement', 'autre']),
             'description' => $this->faker->optional()->sentence,
-            'statut' => $this->faker->randomElement(['en_cours', 'partiellement_recue', 'recue', 'annulee']),
+            'statut' => $this->faker->randomElement(['en_cours', 'terminee', 'annulee']),
         ];
     }
 }

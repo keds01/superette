@@ -60,11 +60,13 @@ class Kernel extends HttpKernel
         'can' => \Illuminate\Auth\Middleware\Authorize::class,
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'password.confirm' => \Illuminate\Auth\Middleware\RequirePassword::class,
+        'precognitive' => \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'checkrole' => \App\Http\Middleware\CheckRole::class,
-        'checkpermission' => \App\Http\Middleware\CheckPermission::class,
+        'check.superette' => \App\Http\Middleware\CheckSuperetteSelected::class,
+        'restrict.caissier' => \App\Http\Middleware\RestrictCaissierAccess::class,
+        'admin.only' => \App\Http\Middleware\RestrictToAdmin::class,
     ];
 
 }

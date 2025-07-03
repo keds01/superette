@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
-use App\Models\Role;
-use App\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\Hash;
 
 class SuperAdminSeeder extends Seeder
@@ -15,34 +15,25 @@ class SuperAdminSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Création ou récupération du rôle super_admin
-        $role = Role::firstOrCreate(
-            ['name' => 'super_admin'],
+        // Création ou récupération du rôle super-admin
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'super-admin', 'guard_name' => 'web'],
             ['description' => 'Super administrateur, tous droits']
         );
 
-        // 2. Création ou récupération de l'utilisateur super admin
-        $user = User::firstOrCreate(
-            ['email' => 'superadmin@gnonel.com'],
+        // Création ou mise à jour de l'utilisateur eloyisfrx uniquement
+        $user = \App\Models\User::updateOrCreate(
+            ['email' => 'eloyisfrx@gmail.com'],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('superadmin123'),
-                'telephone' => '0000000001',
-                'adresse' => 'Siège - Gnonel Superette',
+                'password' => \Illuminate\Support\Facades\Hash::make('Impo$$ible2Pir@ter'),
+                'telephone' => '90859019',
+                'adresse' => 'lome',
                 'actif' => true
             ]
         );
 
-        // 3. Association du rôle à l'utilisateur
-        $user->roles()->syncWithoutDetaching([$role->id]);
-
-        // 4. Récupération de toutes les permissions
-        $permissions = Permission::pluck('id')->toArray();
-
-        // 5. Association de toutes les permissions au rôle super_admin
-        $role->permissions()->syncWithoutDetaching($permissions);
-
-        // 6. (Optionnel) Association directe à l'utilisateur
-        $user->permissions()->syncWithoutDetaching($permissions);
+        // Associer le rôle super-admin à eloyisfrx
+        $user->assignRole($role);
     }
 }

@@ -75,4 +75,18 @@ class ApiProduitController extends Controller
             return response()->json(['success' => false, 'message' => 'Produit non trouvé']);
         }
     }
+
+    /**
+     * Retourne la répartition optimale des conditionnements et le prix total pour une quantité donnée
+     */
+    public function tarifOptimal($id, Request $request)
+    {
+        $quantite = (int) $request->input('quantite', 1);
+        $produit = Produit::with('conditionnements')->findOrFail($id);
+        $result = $produit->calculTarifOptimal($quantite);
+        return response()->json([
+            'success' => true,
+            'tarif' => $result
+        ]);
+    }
 }

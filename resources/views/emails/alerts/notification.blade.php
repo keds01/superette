@@ -39,6 +39,9 @@
     </style>
 </head>
 <body>
+    <div style="text-align:center; margin-bottom: 24px;">
+        <img src="{{ asset('images/LOGO_ELIFRANC_PRIX.png') }}" alt="Logo Elifranc" style="height:48px; width:auto;">
+    </div>
     <div class="container">
         <h2>Notification d'Alerte Système</h2>
 

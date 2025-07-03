@@ -5,19 +5,60 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Caisse;
 use App\Models\Vente;
-
-use Illuminate\Support\Facades\Hash;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\FacadePdf;
 
 class CaisseController extends Controller
 {
     /**
+     * Constructeur avec vérification des permissions
+     */
+    public function __construct()
+    {
+        // Vérifier que l'utilisateur a le rôle de caissier ou admin
+        $this->middleware(function ($request, $next) {
+            if (!Auth::check()) {
+                return redirect()->route('login');
+            }
+            
+            $user = Auth::user();
+            
+            // Vérifier si l'utilisateur a les permissions nécessaires
+            if (!$user->hasRole(['caissier', 'admin', 'super-admin', 'super_admin'])) {
+                Log::warning('Tentative d\'accès non autorisé au module caisse', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'roles' => $user->roles->pluck('name')->toArray(),
+                    'url' => $request->fullUrl(),
+                    'ip' => $request->ip()
+                ]);
+                
+                abort(403, "Vous n'avez pas les autorisations nécessaires pour accéder à cette section.");
+            }
+            
+            return $next($request);
+        });
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index()
     {
+        // Vérifier explicitement la permission
+        if (!Auth::user()->hasPermissionTo('caisse.access')) {
+            Log::warning('Tentative d\'accès non autorisé à l\'interface caisse', [
+                'user_id' => Auth::id(),
+                'email' => Auth::user()->email
+            ]);
+            
+            abort(403, "Vous n'avez pas la permission d'accéder à l'interface caisse.");
+        }
+
         // Récupérer l'ID de la caisse depuis la session
         $caisseId = session('caisse_id');
 
@@ -115,6 +156,20 @@ class CaisseController extends Controller
      */
     public function store(Request $request)
     {
+        // Vérifier explicitement la permission
+        if (!Auth::user()->hasPermissionTo('caisse.operate')) {
+            Log::warning('Tentative d\'opération non autorisée sur la caisse', [
+                'user_id' => Auth::id(),
+                'email' => Auth::user()->email,
+                'operation' => $request->all()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => "Vous n'avez pas la permission d'effectuer des opérations de caisse."
+            ], 403);
+        }
+
         try {
             $validated = $request->validate([
                 'type_operation' => 'required|in:entree,sortie',
@@ -144,35 +199,47 @@ class CaisseController extends Controller
 
             $operation = Caisse::create($validated);
 
-            return redirect()
-                ->route('caisse.index')
-                ->with('success', 'Opération enregistrée avec succès.');
+            return response()->json([
+                'success' => true,
+                'message' => 'Opération enregistrée avec succès.'
+            ]);
         } catch (\Exception $e) {
-            return redirect()
-                ->back()
-                ->withInput()
-                ->with('error', 'Une erreur est survenue : ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue : ' . $e->getMessage()
+            ], 500);
         }
     }
 
     /**
      * Display the specified resource.
      */
-    public function show($id)
+    public function show(Vente $vente)
     {
+        // Vérifier explicitement la permission
+        if (!Auth::user()->hasPermissionTo('caisse.view')) {
+            Log::warning('Tentative de consultation non autorisée d\'une vente en caisse', [
+                'user_id' => Auth::id(),
+                'email' => Auth::user()->email,
+                'vente_id' => $vente->id
+            ]);
+            
+            abort(403, "Vous n'avez pas la permission de consulter les détails de cette vente.");
+        }
+
         if (!session()->has('caisse_id')) {
             // return redirect()->route('caisse.login'); // Commenté pour enlever la redirection
             // Gérer le cas où l'ID de caisse est manquant en session.
         }
 
-        $caisse = Caisse::findOrFail($id);
+        $caisse = Caisse::findOrFail($vente->caisse_id);
         
         if ($caisse->id !== session('caisse_id')) {
             return redirect()->route('caisse.dashboard')
                 ->with('error', 'Vous n\'avez pas accès à cette caisse.');
         }
 
-        return view('caisse.show', compact('caisse'));
+        return view('caisse.show', compact('vente', 'caisse'));
     }
 
     /**
@@ -201,12 +268,33 @@ class CaisseController extends Controller
 
     public function imprimerRecuOperation(Caisse $caisse)
     {
+        // Vérifier explicitement la permission
+        if (!Auth::user()->hasPermissionTo('caisse.print')) {
+            Log::warning('Tentative d\'impression non autorisée d\'un reçu de caisse', [
+                'user_id' => Auth::id(),
+                'email' => Auth::user()->email,
+                'caisse_id' => $caisse->id
+            ]);
+            
+            abort(403, "Vous n'avez pas la permission d'imprimer des reçus de caisse.");
+        }
+
         $caisse->load(['user', 'ventes']);
         return view('caisse.recu_operation', compact('caisse'));
     }
 
     public function rapport(Request $request)
     {
+        // Vérifier explicitement la permission
+        if (!Auth::user()->hasPermissionTo('caisse.report')) {
+            Log::warning('Tentative d\'accès non autorisé au rapport de caisse', [
+                'user_id' => Auth::id(),
+                'email' => Auth::user()->email
+            ]);
+            
+            abort(403, "Vous n'avez pas la permission d'accéder aux rapports de caisse.");
+        }
+
         // Récupérer l'ID de la caisse depuis la session
         $caisseId = session('caisse_id');
 

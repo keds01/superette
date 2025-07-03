@@ -19,7 +19,7 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'nom' => 'required|string|max:255|unique:roles',
+            'name' => 'required|string|max:255|unique:roles',
             'description' => 'nullable|string',
             'permissions' => 'required|array',
             'permissions.*' => 'exists:permissions,id'
@@ -27,7 +27,7 @@ class RoleController extends Controller
 
         DB::transaction(function () use ($request) {
             $role = Role::create([
-                'nom' => $request->nom,
+                'name' => $request->name,
                 'description' => $request->description
             ]);
 
@@ -41,7 +41,7 @@ class RoleController extends Controller
     public function update(Request $request, Role $role)
     {
         $request->validate([
-            'nom' => 'required|string|max:255|unique:roles,nom,' . $role->id,
+            'name' => 'required|string|max:255|unique:roles,name,' . $role->id,
             'description' => 'nullable|string',
             'permissions' => 'required|array',
             'permissions.*' => 'exists:permissions,id'
@@ -49,7 +49,7 @@ class RoleController extends Controller
 
         DB::transaction(function () use ($request, $role) {
             $role->update([
-                'nom' => $request->nom,
+                'name' => $request->name,
                 'description' => $request->description
             ]);
 

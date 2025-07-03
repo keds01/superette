@@ -167,6 +167,9 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                         <div class="flex items-center justify-center gap-2">
+                                            <a href="{{ route('mouvements-stock.create') }}?product_id={{ $alerte->produit_id }}" class="text-green-600 hover:text-green-900" title="Mouvement Stock">
+                                                <i class="fas fa-dolly-flatbed"></i>
+                                            </a>
                                             <button onclick="document.getElementById('modalModifierAlerte{{ $alerte->id }}').classList.remove('hidden')"
                                                     class="text-indigo-600 hover:text-indigo-900">
                                                 <i class="fas fa-edit"></i>

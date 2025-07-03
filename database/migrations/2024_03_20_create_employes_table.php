@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->string('nom');
             $table->string('prenom')->nullable();
-            $table->string('email')->unique();
+            $table->string('email')->nullable();
             $table->string('telephone')->nullable();
             $table->string('poste')->nullable();
             $table->enum('statut', ['actif', 'inactif'])->default('actif');

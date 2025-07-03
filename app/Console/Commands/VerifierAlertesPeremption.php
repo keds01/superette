@@ -49,6 +49,14 @@ class VerifierAlertesPeremption extends Command
                                          ->where('type', 'peremption')
                                          ->first();
                 
+                // Récupérer la superette_id du produit
+                $superetteId = $produit->superette_id;
+                
+                // Si le produit n'a pas de superette_id, utiliser la superette par défaut (ID 1)
+                if (!$superetteId) {
+                    $superetteId = 1; // Superette par défaut
+                }
+                
                 if ($alerteExistante) {
                     // Mettre à jour l'alerte si nécessaire
                     if (!$alerteExistante->estDeclenchee) {
@@ -56,7 +64,8 @@ class VerifierAlertesPeremption extends Command
                             'estDeclenchee' => true,
                             'periode' => $delaiAlerte,
                             'message' => "Le produit {$produit->nom} va expirer dans {$joursRestants} jour(s)",
-                            'date_peremption' => $produit->date_peremption
+                            'date_peremption' => $produit->date_peremption,
+                            'superette_id' => $alerteExistante->superette_id ?? $superetteId
                         ]);
                         
                         $this->info("✓ Alerte mise à jour pour {$produit->nom} - Expiration dans {$joursRestants} jour(s)");
@@ -71,7 +80,8 @@ class VerifierAlertesPeremption extends Command
                         'message' => "Le produit {$produit->nom} va expirer dans {$joursRestants} jour(s)",
                         'estDeclenchee' => true,
                         'actif' => true,
-                        'date_peremption' => $produit->date_peremption
+                        'date_peremption' => $produit->date_peremption,
+                        'superette_id' => $superetteId
                     ]);
                     
                     $this->info("+ Nouvelle alerte créée pour {$produit->nom} - Expiration dans {$joursRestants} jour(s)");
@@ -82,12 +92,21 @@ class VerifierAlertesPeremption extends Command
                 $alerteExistante = Alerte::where('produit_id', $produit->id)
                                          ->where('type', 'peremption')
                                          ->first();
+                
+                // Récupérer la superette_id du produit
+                $superetteId = $produit->superette_id;
+                
+                // Si le produit n'a pas de superette_id, utiliser la superette par défaut (ID 1)
+                if (!$superetteId) {
+                    $superetteId = 1; // Superette par défaut
+                }
                                          
                 if ($alerteExistante) {
                     // Mettre à jour l'alerte pour indiquer que le produit est périmé
                     $alerteExistante->update([
                         'estDeclenchee' => true,
                         'message' => "Le produit {$produit->nom} est périmé depuis " . abs($joursRestants) . " jour(s)",
+                        'superette_id' => $alerteExistante->superette_id ?? $superetteId
                     ]);
                     
                     $this->info("! Alerte mise à jour pour {$produit->nom} - PÉRIMÉ depuis " . abs($joursRestants) . " jour(s)");
@@ -101,7 +120,8 @@ class VerifierAlertesPeremption extends Command
                         'message' => "Le produit {$produit->nom} est périmé depuis " . abs($joursRestants) . " jour(s)",
                         'estDeclenchee' => true,
                         'actif' => true,
-                        'date_peremption' => $produit->date_peremption
+                        'date_peremption' => $produit->date_peremption,
+                        'superette_id' => $superetteId
                     ]);
                     
                     $this->info("! Nouvelle alerte créée pour {$produit->nom} - PÉRIMÉ depuis " . abs($joursRestants) . " jour(s)");

@@ -16,24 +16,19 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UnitesSystemSeeder::class, // Notre seeder pour les unités système
             CategoriesSystemSeeder::class,
-            ProduitsSystemSeeder::class,
-            UserSeeder::class,          // Seeder pour les utilisateurs et rôles
-            PromotionSeeder::class, // Ajouté pour la promo riz
-            RolesAndPermissionsSeeder::class, // Notre nouveau seeder pour rôles et permissions
-            // PermissionSeeder::class,    // Ancien seeder pour les permissions (remplacé)
-            EmployeSeeder::class,       // Seeder pour les employés
+            // ProduitsSystemSeeder::class, // Supprimé
+            // RolesAndPermissionsSeeder::class, // Supprimé
+            // UserSeeder::class,          // Supprimé
+            SuperetteSeeder::class,     // Ajout du seeder de superette par défaut
+            // PromotionSeeder::class, // Supprimé
+            // EmployeSeeder::class,       // Supprimé
             UnitSeeder::class,
-            // ProductSeeder::class,          // Fichier manquant, commenté temporairement
-            // ClientSeeder::class,          // Fichier manquant, commenté temporairement
-            // EmployeSeeder::class,         // Fichier manquant, commenté temporairement
-            // StockMovementSeeder::class,    // Fichier manquant, commenté temporairement
-            // AlertSeeder::class,            // Fichier manquant, commenté temporairement
-            // VenteSeeder::class,            // Fichier manquant, commenté temporairement
-            // CaisseSeeder::class,           // Fichier manquant, commenté temporairement
-            SuperAdminSeeder::class,
-            DefaultEmployeSeeder::class,
-            ReceptionSeeder::class,      // Seeder pour les réceptions et leurs détails
-            CommandeSeeder::class,       // Seeder pour les commandes fournisseurs et leurs détails
+            // VenteSeeder::class,         // Supprimé
+            // SuperAdminSeeder::class, // Désactivé (Spatie)
+            // PermissionSeeder::class, // Désactivé (Spatie)
+            // RolesSeeder::class, // Désactivé (Spatie)
+            // UserWithRolesSeeder::class, // Désactivé (utilisateurs de test)
+            SuperAdminUserSeeder::class,
             // Ajoute ici d'autres seeders si nécessaire
         ]);
     }

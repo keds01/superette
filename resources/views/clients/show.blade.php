@@ -111,7 +111,7 @@
                                             <tr>
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{{ $vente->numero_vente }}</td>
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $vente->date_vente->format('d/m/Y H:i') }}</td>
-                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-semibold">{{ number_format($vente->montant_net, 0, ',', ' ') }} FCFA</td>
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-semibold">{{ number_format($vente->montant_total, 0, ',', ' ') }} FCFA</td>
                                                 <td class="px-4 py-3 whitespace-nowrap text-sm">
                                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $vente->statut_color['bg'] }} {{ $vente->statut_color['text'] }}">
                                                         {{ ucfirst($vente->statut) }}
@@ -157,7 +157,7 @@
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500">Montant total dépensé</p>
-                                <p class="mt-1 text-2xl font-bold text-indigo-600">{{ number_format($ventes_sum_montant_net, 0, ',', ' ') }} FCFA</p>
+                                <p class="mt-1 text-2xl font-bold text-indigo-600">{{ isset($ventes_sum_montant_total) ? number_format($ventes_sum_montant_total, 0, ',', ' ') : '0' }} FCFA</p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-500">Date de la dernière vente</p>

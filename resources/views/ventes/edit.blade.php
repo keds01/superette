@@ -1,88 +1,137 @@
 @extends('layouts.app')
 
-@section('title', 'Modifier la Vente #' . $vente->numero)
+@section('title', 'Modifier la vente')
 
 @section('content')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Modifier la Vente #{{ $vente->numero }}</h5>
+<div class="w-full max-w-5xl mx-auto py-8" x-data="venteEditSystem">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+        <div>
+            <h2 class="text-3xl font-bold bg-gradient-to-tr from-yellow-400 to-yellow-600 bg-clip-text text-transparent tracking-tight flex items-center gap-3">
+                <i class="fas fa-edit"></i>
+                Modifier la vente
+            </h2>
+            <p class="text-gray-500 text-lg">N° {{ $vente->numero_vente }} — {{ date('d/m/Y H:i', strtotime($vente->date_vente)) }}</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+            <a href="{{ route('ventes.show', $vente) }}"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-semibold shadow-sm hover:bg-indigo-50 transition-all duration-200">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+            <a href="{{ route('ventes.facture', $vente) }}" target="_blank"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-blue-600 to-blue-400 text-white font-semibold shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-file-invoice"></i> Facture
+            </a>
+            <a href="{{ route('ventes.recu', $vente) }}" target="_blank"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-gray-800 to-gray-600 text-white font-semibold shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-receipt"></i> Ticket
+            </a>
+            @if($vente->statut === 'en_cours' && auth()->user()->can('ventes.edit'))
+                <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-red-500 to-red-600 text-white font-semibold shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200" data-bs-toggle="modal" data-bs-target="#modalAnnuler">
+                    <i class="fas fa-times"></i> Annuler la vente
+                </button>
+            @endif
+        </div>
+    </div>
+
+    @if($vente->statut !== 'en_cours')
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded mb-6 flex items-center gap-2">
+            <i class="fas fa-exclamation-triangle"></i>
+            Cette vente ne peut plus être modifiée car son statut est "{{ $vente->statut }}".
+        </div>
+    @else
+        <form action="{{ route('ventes.update', $vente) }}" method="POST" id="formVente" class="space-y-8">
+            @csrf
+            @method('PUT')
+
+            <!-- Bloc infos générales -->
+            <div class="bg-white/90 shadow-xl rounded-2xl p-6 border border-yellow-100">
+                <h3 class="text-xl font-semibold text-yellow-700 mb-4 flex items-center gap-2">
+                    <i class="fas fa-user"></i> Informations générales
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <a href="{{ route('ventes.show', $vente) }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Retour
-                        </a>
-                        @if($vente->statut === 'en_cours' && auth()->user()->can('ventes.edit'))
-                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalAnnuler">
-                                <i class="fas fa-times"></i> Annuler la vente
-                            </button>
-                        @endif
+                        <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1">Client <span class="text-red-500">*</span></label>
+                        <select name="client_id" id="client_id" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500">
+                            <option value="">Sélectionner un client...</option>
+                            @foreach($clients as $client)
+                                <option value="{{ $client->id }}" {{ old('client_id', $vente->client_id) == $client->id ? 'selected' : '' }}>
+                                    {{ $client->nom }} {{ $client->prenom }} - {{ $client->telephone }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('client_id')
+                            <div class="text-red-600 text-sm">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="type_vente" class="block text-sm font-medium text-gray-700 mb-1">Type de vente <span class="text-red-500">*</span></label>
+                        <select name="type_vente" id="type_vente" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500">
+                            <option value="">Sélectionner...</option>
+                            <option value="sur_place" {{ old('type_vente', $vente->type_vente) == 'sur_place' ? 'selected' : '' }}>Sur place</option>
+                            <option value="a_emporter" {{ old('type_vente', $vente->type_vente) == 'a_emporter' ? 'selected' : '' }}>À emporter</option>
+                            <option value="livraison" {{ old('type_vente', $vente->type_vente) == 'livraison' ? 'selected' : '' }}>Livraison</option>
+                        </select>
+                        @error('type_vente')
+                            <div class="text-red-600 text-sm">{{ $message }}</div>
+                        @enderror
                     </div>
                 </div>
-                <div class="card-body">
-                    @if($vente->statut !== 'en_cours')
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            Cette vente ne peut plus être modifiée car son statut est "{{ $vente->statut }}".
-                        </div>
-                    @else
-                        <form action="{{ route('ventes.update', $vente) }}" method="POST" id="formVente">
-                            @csrf
-                            @method('PUT')
-                            
-                            <!-- Informations générales -->
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Informations Générales</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="mb-3">
-                                                <label for="client_id" class="form-label">Client</label>
-                                                <select name="client_id" id="client_id" class="form-select" required {{ $vente->statut !== 'en_cours' ? 'disabled' : '' }}>
-                                                    <option value="">Sélectionner un client...</option>
-                                                    @foreach($clients as $client)
-                                                        <option value="{{ $client->id }}" {{ old('client_id', $vente->client_id) == $client->id ? 'selected' : '' }}>
-                                                            {{ $client->nom }} {{ $client->prenom }} - {{ $client->telephone }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                @error('client_id')
-                                                    <div class="text-danger">{{ $message }}</div>
-                                                @enderror
-                                            </div>
+                <div class="mt-4">
+                    <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea name="notes" id="notes" rows="2" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500">{{ old('notes', $vente->notes) }}</textarea>
+                </div>
+            </div>
 
-                                            <div class="mb-3">
-                                                <label for="type_vente" class="form-label">Type de vente</label>
-                                                <select name="type_vente" id="type_vente" class="form-select" required {{ $vente->statut !== 'en_cours' ? 'disabled' : '' }}>
-                                                    <option value="">Sélectionner...</option>
-                                                    <option value="sur_place" {{ old('type_vente', $vente->type_vente) == 'sur_place' ? 'selected' : '' }}>Sur place</option>
-                                                    <option value="a_emporter" {{ old('type_vente', $vente->type_vente) == 'a_emporter' ? 'selected' : '' }}>À emporter</option>
-                                                    <option value="livraison" {{ old('type_vente', $vente->type_vente) == 'livraison' ? 'selected' : '' }}>Livraison</option>
-                                                </select>
-                                                @error('type_vente')
-                                                    <div class="text-danger">{{ $message }}</div>
-                                                @enderror
-                                            </div>
-
-                                            <div class="mb-3">
-                                                <label for="notes" class="form-label">Notes</label>
-                                                <textarea name="notes" id="notes" class="form-control" rows="2" {{ $vente->statut !== 'en_cours' ? 'disabled' : '' }}>{{ old('notes', $vente->notes) }}</textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Récapitulatif</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="table-responsive">
-                                                <table class="table table-sm">
+            <!-- Bloc produits -->
+            <div class="bg-white/90 shadow-xl rounded-2xl p-6 border border-blue-100">
+                <h3 class="text-xl font-semibold text-blue-700 mb-4 flex items-center gap-2">
+                    <i class="fas fa-box"></i> Produits de la vente
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full table-auto border rounded-lg" id="tableProduits">
+                        <thead>
+                            <tr class="bg-blue-50">
+                                <th class="px-4 py-2">Produit</th>
+                                <th class="px-4 py-2">Prix unitaire</th>
+                                <th class="px-4 py-2">Quantité</th>
+                                <th class="px-4 py-2">Sous-total</th>
+                                <th class="px-4 py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($vente->details as $index => $detail)
+                                <tr id="ligne_{{ $index }}">
+                                    <td>
+                                        <select name="produits[{{ $index }}][produit_id]" class="form-select produit-select" required>
+                                            <option value="">Sélectionner...</option>
+                                            @foreach($produits as $produit)
+                                                <option value="{{ $produit->id }}" {{ $detail->produit_id == $produit->id ? 'selected' : '' }}>
+                                                    {{ $produit->nom }} (Stock: {{ $produit->stock }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" min="0" name="produits[{{ $index }}][prix_unitaire]" class="form-input prix-unitaire" value="{{ $detail->prix_unitaire }}" required />
+                                    </td>
+                                    <td>
+                                        <input type="number" min="1" name="produits[{{ $index }}][quantite]" class="form-input quantite" value="{{ $detail->quantite }}" required />
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-input sous-total" value="{{ number_format($detail->quantite * $detail->prix_unitaire, 0, ',', ' ') }}" readonly />
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-danger btn-sm remove-ligne"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <button type="button" class="mt-4 btn btn-success" id="ajouterLigne">
+                    <i class="fas fa-plus"></i> Ajouter un produit
+                </button>
+            </div>
                                                     <tr>
                                                         <th style="width: 200px">Sous-total HT</th>
                                                         <td class="text-end" id="sousTotal">{{ number_format($vente->montant_ht, 2, ',', ' ') }} €</td>

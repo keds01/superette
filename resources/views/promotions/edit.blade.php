@@ -7,7 +7,7 @@
             <div>
                 <h2 class="text-2xl font-bold text-gray-900">Modifier la Promotion</h2>
                 <p class="mt-1 text-sm text-gray-500">
-                    Modifiez les détails de la promotion pour le produit {{ $promotion->product->nom }}.
+                    Modifiez les détails de la promotion pour le produit {{ $promotion->produit->nom ?? 'Produit supprimé' }}.
                 </p>
             </div>
             <a href="{{ route('promotions.index') }}" 
@@ -29,7 +29,7 @@
                     <label for="product_id" class="block text-sm font-medium text-gray-700">Produit</label>
                     <select name="product_id" id="product_id" required
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        @foreach($products as $product)
+                        @foreach($produits as $product)
                             <option value="{{ $product->id }}" 
                                 {{ (old('product_id', $promotion->product_id) == $product->id) ? 'selected' : '' }}>
                                 {{ $product->nom }} ({{ $product->code }})

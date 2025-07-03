@@ -59,3 +59,83 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+# Fonctionnalité Multi-Boutiques (Superettes)
+
+## Présentation
+
+Le système supporte désormais la gestion de plusieurs boutiques centralisée dans une seule instance de l'application. Cette architecture multi-tenant permet :
+
+- À un Super Admin de gérer plusieurs superettes (boutiques) de manière isolée
+- De cloisonner complètement les données entre les différentes superettes
+- D'assigner des employés à une superette spécifique
+
+## Architecture
+
+L'implémentation utilise une approche de **multi-tenancy à base de données unique** :
+
+- Une table `superettes` centrale contient les informations de chaque boutique
+- Une colonne `superette_id` dans les tables principales établit la relation et le cloisonnement
+- Des global scopes Eloquent automatisent la filtration des données par superette
+
+## Rôles et accès
+
+Le système distingue deux types principaux d'utilisateurs :
+
+1. **Super Admin**
+   - N'est rattaché à aucune superette par défaut
+   - Peut naviguer entre les superettes via un sélecteur dans la barre de navigation
+   - Peut créer/modifier/supprimer des superettes
+   - Peut assigner des utilisateurs à des superettes
+
+2. **Utilisateurs standards** (employés, caissiers, etc.)
+   - Obligatoirement rattachés à une superette spécifique
+   - Ne peuvent voir que les données de leur propre superette
+   - Ne peuvent pas changer de contexte
+
+## Navigation et interface
+
+- Les Super Admins sont redirigés vers une page de sélection de superette s'ils n'en ont pas sélectionné une
+- Un badge dans l'interface indique la superette active pour les Super Admins
+- Les utilisateurs standards n'ont pas besoin de sélectionner une superette, leur contexte est automatiquement fixé
+
+## Commandes
+
+Pour créer une nouvelle superette via la ligne de commande :
+
+```bash
+php artisan make:superette "Nom de la superette" [options]
+```
+
+Options disponibles :
+- `--code` : Code unique (généré automatiquement si non fourni)
+- `--adresse` : Adresse physique
+- `--telephone` : Numéro de téléphone
+- `--email` : Email de contact
+- `--description` : Description détaillée
+
+## Migrations et modèles
+
+Pour ajouter une nouvelle entité au système multi-boutiques, suivez ces étapes :
+
+1. Ajoutez un champ `superette_id` à la table via une migration
+2. Ajoutez le trait `HasSuperette` au modèle Eloquent correspondant
+3. Ajoutez `superette_id` à la liste des champs fillables du modèle
+
+Exemple :
+```php
+// Dans le modèle
+use App\Traits\HasSuperette;
+
+class MonModele extends Model
+{
+    use HasSuperette;
+    
+    protected $fillable = [
+        'superette_id',
+        // autres champs...
+    ];
+}
+```
+
+Grâce au global scope automatiquement appliqué, toutes les requêtes sur ce modèle seront filtrées par la superette active du contexte utilisateur.

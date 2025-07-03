@@ -57,7 +57,7 @@ class Profile extends Model
 
     public function isAdmin()
     {
-        return $this->hasRole('admin');
+        return $this->hasRole(['admin', 'super_admin']);
     }
 
     public function isCaissier()

@@ -44,6 +44,24 @@
                         </span>
                     </div>
                 </div>
+                <div>
+                    <label for="superette_id" class="block text-sm font-medium text-gray-700 mb-1">Superette</label>
+                    <div class="relative">
+                        <select name="superette_id" id="superette_id" 
+                            class="w-full rounded-xl border-indigo-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-4 py-3 text-gray-900 shadow-sm">
+                            <option value="">Aucune (Super Admin)</option>
+                            @foreach(App\Models\Superette::orderBy('nom')->get() as $superette)
+                                <option value="{{ $superette->id }}" {{ old('superette_id') == $superette->id ? 'selected' : '' }}>
+                                    {{ $superette->nom }} ({{ $superette->code }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <span class="absolute right-3 top-3.5 text-indigo-400">
+                            <i class="fas fa-store"></i>
+                        </span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Laisser vide uniquement pour les Super Administrateurs. Les utilisateurs standards doivent être affectés à une superette.</p>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
@@ -70,10 +88,12 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Rôles</label>
                     <div class="flex flex-wrap gap-3">
                         @foreach($roles as $role)
-                            <label class="inline-flex items-center px-3 py-2 bg-indigo-50 rounded-xl shadow-sm cursor-pointer hover:bg-indigo-100">
-                                <input type="checkbox" name="roles[]" value="{{ $role->id }}" class="form-checkbox text-indigo-600 mr-2">
-                                <span class="text-indigo-700 font-medium">{{ $role->name }}</span>
-                            </label>
+                            @if($role->name !== 'gestionnaire')
+                                <label class="inline-flex items-center px-3 py-2 bg-indigo-50 rounded-xl shadow-sm cursor-pointer hover:bg-indigo-100">
+                                    <input type="checkbox" name="roles[]" value="{{ $role->id }}" class="form-checkbox text-indigo-600 mr-2">
+                                    <span class="text-indigo-700 font-medium">{{ $role->name }}</span>
+                                </label>
+                            @endif
                         @endforeach
                     </div>
                 </div>

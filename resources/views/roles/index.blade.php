@@ -52,7 +52,7 @@
                 <tbody class="bg-white/80 divide-y divide-blue-50">
                     @foreach ($roles as $role)
                     <tr class="hover:bg-blue-50/70 transition-all">
-                        <td class="px-6 py-4 whitespace-nowrap font-bold text-blue-600">{{ $role->nom }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap font-bold text-blue-600">{{ $role->name }}</td>
                         <td class="px-6 py-4">{{ $role->description }}</td>
                         <td class="px-6 py-4">
                             <div class="flex flex-wrap gap-1">
@@ -104,7 +104,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div class="mb-4">
                         <label for="nom" class="block text-sm font-medium text-gray-700">Nom du rôle</label>
-                        <input type="text" name="nom" id="nom" required
+                        <input type="text" name="name" id="name" required
                                class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
                     </div>
                     <div class="mb-4">
@@ -154,7 +154,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div class="mb-4">
                         <label for="edit_nom" class="block text-sm font-medium text-gray-700">Nom du rôle</label>
-                        <input type="text" name="nom" id="edit_nom" required
+                        <input type="text" name="name" id="edit_nom" required
                                class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
                     </div>
                     <div class="mb-4">
@@ -194,7 +194,7 @@
 
 @push('scripts')
 <script>
-    function editRole(id, nom, description, permissions) {
+    function editRole(id, name, description, permissions) {
         const modal = document.getElementById('editRoleModal');
         const form = document.getElementById('editRoleForm');
         const nomInput = document.getElementById('edit_nom');
@@ -202,7 +202,7 @@
         const permissionInputs = document.querySelectorAll('.edit-permission');
 
         form.action = `/roles/${id}`;
-        nomInput.value = nom;
+        nomInput.value = name;
         descriptionInput.value = description;
 
         permissionInputs.forEach(input => {

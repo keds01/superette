@@ -13,12 +13,17 @@ class DetailReceptionFactory extends Factory
 
     public function definition()
     {
+        $datePeremption = null;
+        if ($this->faker->boolean(70)) { // 70% de chance d'avoir une date de péremption
+            $datePeremption = $this->faker->dateTimeBetween('now', '+2 years')->format('Y-m-d');
+        }
+
         return [
             'reception_id' => Reception::factory(), // Sera généralement surchargé
             'produit_id' => Produit::inRandomOrder()->first()?->id ?? Produit::factory(),
             'quantite' => $this->faker->numberBetween(1, 100),
             'prix_unitaire' => $this->faker->randomFloat(2, 100, 10000),
-            'date_peremption' => $this->faker->optional(0.7)->dateTimeBetween('now', '+2 years')->format('Y-m-d'),
+            'date_peremption' => $datePeremption,
         ];
     }
 }

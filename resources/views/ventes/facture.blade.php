@@ -166,12 +166,8 @@
 
     <div class="page">
         <div class="header">
-            <div class="logo">
-                @if(config('app.logo'))
-                    <img src="{{ config('app.logo') }}" alt="Logo" style="max-width: 200px;">
-                @else
-                    <h1 style="margin: 0;">{{ config('app.name') }}</h1>
-                @endif
+            <div class="logo" style="display: flex; align-items: center;">
+                <img src="/images/LOGO_ELIFRANC_PRIX.png" alt="Logo Elifranc" style="height: 128px; width: auto; display: block;">
             </div>
             <div class="info-entreprise">
                 <p style="margin: 0;">{{ config('app.adresse') }}</p>
@@ -183,10 +179,12 @@
             </div>
         </div>
 
+        
+
         <div class="titre">FACTURE</div>
 
         <div class="numero-facture">
-            <strong>N° {{ $vente->numero }}</strong><br>
+            <strong>N° Vente : {{ $vente->numero_vente ?? $vente->numero ?? $vente->id }}</strong><br>
             Date: {{ $vente->date_vente->format('d/m/Y H:i') }}<br>
             <span class="statut statut-{{ $vente->statut }}">
                 {{ ucfirst($vente->statut) }}
@@ -205,8 +203,9 @@
                 @endif
                 Tél: {{ $vente->client->telephone }}<br>
                 @if($vente->client->email)
-                    Email: {{ $vente->client->email }}
+                    Email: {{ $vente->client->email }}<br>
                 @endif
+                <span style="font-weight:bold; color:#2c3e50;">Vendeur :</span> {{ $vente->employe ? $vente->employe->nom . ' ' . $vente->employe->prenom : 'Non spécifié' }}
             </p>
         </div>
 
@@ -215,19 +214,53 @@
                 <tr>
                     <th>Produit</th>
                     <th class="text-right">Prix unitaire HT</th>
+                    <th class="text-right">Promo</th>
                     <th class="text-center">Quantité</th>
                     <th class="text-right">Remise</th>
-                    <th class="text-right">Total HT</th>
+                    <th class="text-right">Sous-total</th>
                 </tr>
             </thead>
             <tbody>
+                @php
+                    $totalPromos = 0;
+                    $totalFinal = 0;
+                @endphp
                 @foreach($vente->details as $detail)
-                    <tr>
-                        <td>{{ $detail->produit->nom }}</td>
-                        <td class="text-right">{{ number_format($detail->prix_unitaire, 2, ',', ' ') }} FCFA</td>
+                    @php
+                        $prixUnitaire = $detail->prix_unitaire;
+                        $prixPromo = $detail->produit->prix_promo ?? $prixUnitaire;
+                        $estEnPromo = $prixPromo < $prixUnitaire;
+                        $sousTotal = ($estEnPromo ? $prixPromo : $prixUnitaire) * $detail->quantite;
+                        if ($estEnPromo) {
+                            $totalPromos += ($prixUnitaire - $prixPromo) * $detail->quantite;
+                        }
+                        $totalFinal += $sousTotal;
+                    @endphp
+                    <tr @if($estEnPromo) style="background:#fffbe6;" @endif>
+                        <td>
+                            {{ $detail->produit->nom }}
+                            @if($estEnPromo)
+                                <span style="background:#ffe066;color:#b8860b;font-size:10px;padding:2px 6px;border-radius:8px;margin-left:4px;">Promo</span>
+                            @endif
+                        </td>
+                        <td class="text-right">
+                            <span @if($estEnPromo) style="text-decoration:line-through;color:#bbb;" @endif>
+                                {{ number_format($prixUnitaire, 2, ',', ' ') }} FCFA
+                            </span>
+                            @if($estEnPromo)
+                                <br><span style="color:#27ae60;font-weight:bold;">{{ number_format($prixPromo, 2, ',', ' ') }} FCFA</span>
+                            @endif
+                        </td>
+                        <td class="text-right">
+                            @if($estEnPromo)
+                                <span style="color:#27ae60;font-weight:bold;">-{{ number_format($prixUnitaire - $prixPromo, 2, ',', ' ') }} FCFA</span>
+                            @else
+                                <span style="color:#bbb;">-</span>
+                            @endif
+                        </td>
                         <td class="text-center">{{ $detail->quantite }}</td>
                         <td class="text-right">{{ number_format($detail->remise, 2, ',', ' ') }} FCFA</td>
-                        <td class="text-right">{{ number_format($detail->montant_total, 2, ',', ' ') }} FCFA</td>
+                        <td class="text-right">{{ number_format($sousTotal, 2, ',', ' ') }} FCFA</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -235,24 +268,37 @@
 
         <div class="total-section">
             <table>
+                @if($totalPromos > 0)
                 <tr>
-                    <td>Total HT</td>
-                    <td class="text-right">{{ number_format($vente->montant_ht, 2, ',', ' ') }} FCFA</td>
+                    <td style="color:#27ae60;font-weight:bold;">Économies promotionnelles :</td>
+                    <td class="text-right" style="color:#27ae60;font-weight:bold;">-{{ number_format($totalPromos, 2, ',', ' ') }} FCFA</td>
                 </tr>
-                <tr>
-                    <td>TVA (20%)</td>
-                    <td class="text-right">{{ number_format($vente->montant_tva, 2, ',', ' ') }} FCFA</td>
-                </tr>
-                @if($vente->montant_remise > 0)
-                    <tr>
-                        <td>Remises</td>
-                        <td class="text-right">-{{ number_format($vente->montant_remise, 2, ',', ' ') }} FCFA</td>
-                    </tr>
                 @endif
                 <tr>
                     <td>Total TTC</td>
-                    <td class="text-right">{{ number_format($vente->montant_total, 2, ',', ' ') }} FCFA</td>
+                    <td class="text-right">{{ number_format($totalFinal, 2, ',', ' ') }} FCFA</td>
                 </tr>
+                <tr>
+                    <td style="color:#27ae60;font-weight:bold;">Montant payé</td>
+                    <td class="text-right" style="color:#27ae60;font-weight:bold;">{{ number_format($vente->montant_paye, 2, ',', ' ') }} FCFA</td>
+                </tr>
+                @php $reste = $vente->montant_total - $vente->montant_paye; @endphp
+                @if($reste > 0)
+                <tr>
+                    <td style="color:#e74c3c;font-weight:bold;">Reste à payer</td>
+                    <td class="text-right" style="color:#e74c3c;font-weight:bold;">{{ number_format($reste, 2, ',', ' ') }} FCFA</td>
+                </tr>
+                @elseif($reste < 0)
+                <tr>
+                    <td style="color:#27ae60;font-weight:bold;">Monnaie rendue</td>
+                    <td class="text-right" style="color:#27ae60;font-weight:bold;">{{ number_format(abs($reste), 2, ',', ' ') }} FCFA</td>
+                </tr>
+                @else
+                <tr>
+                    <td style="color:#27ae60;font-weight:bold;">Payé intégralement</td>
+                    <td class="text-right" style="color:#27ae60;font-weight:bold;">0 FCFA</td>
+                </tr>
+                @endif
             </table>
         </div>
 
@@ -274,7 +320,16 @@
                 @endforeach
                 <div style="margin-top: 10px;">
                     <strong>Montant payé :</strong> {{ number_format($vente->montant_paye, 2, ',', ' ') }} FCFA<br>
-                    <strong>Reste à payer :</strong> {{ number_format($vente->montant_total - $vente->montant_paye, 2, ',', ' ') }} FCFA
+                    @php
+                        $reste = $vente->montant_total - $vente->montant_paye;
+                    @endphp
+                    @if($reste > 0)
+                        <strong>Reste à payer :</strong> {{ number_format($reste, 2, ',', ' ') }} FCFA
+                    @elseif($reste < 0)
+                        <strong>Monnaie rendue :</strong> {{ number_format(abs($reste), 2, ',', ' ') }} FCFA
+                    @else
+                        <strong>Payé intégralement</strong>
+                    @endif
                 </div>
             </div>
         @endif

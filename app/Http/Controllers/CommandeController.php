@@ -2,195 +2,204 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Commande;
+use App\Models\Approvisionnement;
 use App\Models\Fournisseur;
 use App\Models\Produit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class CommandeController extends Controller
 {
+    /**
+     * Affiche la liste des commandes
+     */
     public function index()
     {
-        $commandes = Commande::with(['fournisseur'])
-            ->latest()
-            ->paginate(10);
+        $commandes = Approvisionnement::with(['fournisseur', 'details.produit'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
 
         return view('commandes.index', compact('commandes'));
     }
 
+    /**
+     * Affiche le formulaire de création d'une commande
+     */
     public function create()
     {
-        $fournisseurs = Fournisseur::where('actif', true)
-            ->orderBy('nom')
-            ->get();
-
-        $produits = Produit::with(['categorie', 'uniteVente'])
-            ->where('actif', true)
-            ->orderBy('nom')
-            ->get();
+        $fournisseurs = Fournisseur::where('actif', true)->get();
+        $produits = Produit::orderBy('nom')->get();
 
         return view('commandes.create', compact('fournisseurs', 'produits'));
     }
 
+    /**
+     * Enregistre une nouvelle commande
+     */
     public function store(Request $request)
     {
-        // Validation améliorée pour vérifier les doublons de produits
         $validated = $request->validate([
-            'numero_commande' => 'required|unique:commandes',
             'fournisseur_id' => 'required|exists:fournisseurs,id',
             'date_commande' => 'required|date',
-            'date_livraison_prevue' => 'required|date|after_or_equal:date_commande',
+            'date_livraison_prevue' => 'nullable|date|after_or_equal:date_commande',
             'produits' => 'required|array|min:1',
-            'produits.*' => [
-                'required',
-                'exists:produits,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    // Vérifier s'il y a des doublons de produits
-                    $produits = $request->input('produits');
-                    if (count(array_keys($produits, $value)) > 1) {
-                        $fail('Le produit a été sélectionné plusieurs fois. Veuillez ajuster les quantités plutôt que de dupliquer le produit.');
-                    }
-                }
-            ],
-            'quantites' => 'required|array|min:1',
-            'quantites.*' => 'required|numeric|min:0.01',
-            'prix_unitaire' => 'required|array|min:1',
-            'prix_unitaire.*' => 'required|numeric|min:0.01',
-            'montant_total' => 'required|numeric|min:0',
-            'devise' => 'required|in:FCFA,EUR,USD',
+            'produits.*.produit_id' => 'required|exists:produits,id',
+            'produits.*.quantite' => 'required|numeric|min:1',
+            'produits.*.prix_unitaire' => 'required|numeric|min:0',
+            'notes' => 'nullable|string|max:500'
         ]);
 
-        // Utilisation d'une transaction explicite
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($validated) {
-            $commande = Commande::create([
-                'numero_commande' => $validated['numero_commande'],
+        try {
+            DB::beginTransaction();
+
+            $commande = Approvisionnement::create([
                 'fournisseur_id' => $validated['fournisseur_id'],
                 'date_commande' => $validated['date_commande'],
                 'date_livraison_prevue' => $validated['date_livraison_prevue'],
-                'montant_total' => $validated['montant_total'],
-                'devise' => $validated['devise'],
                 'statut' => 'en_attente',
+                'notes' => $validated['notes'] ?? null,
+                'user_id' => Auth::id()
             ]);
 
             // Créer les détails de la commande
-            foreach ($validated['produits'] as $index => $produitId) {
+            foreach ($validated['produits'] as $produit) {
                 $commande->details()->create([
-                    'produit_id' => $produitId,
-                    'quantite' => $validated['quantites'][$index],
-                    'prix_unitaire' => $validated['prix_unitaire'][$index],
-                    'montant_total' => $validated['quantites'][$index] * $validated['prix_unitaire'][$index],
+                    'produit_id' => $produit['produit_id'],
+                    'quantite' => $produit['quantite'],
+                    'prix_unitaire' => $produit['prix_unitaire'],
+                    'sous_total' => $produit['quantite'] * $produit['prix_unitaire']
                 ]);
             }
 
-            return redirect()
-                ->route('commandes.show', $commande)
-                ->with('success', 'La commande a été créée avec succès.');
-        });
+            // Calculer le montant total
+            $total = $commande->details->sum('sous_total');
+            $commande->update(['montant_total' => $total]);
+
+            DB::commit();
+
+            return redirect()->route('commandes.show', $commande)
+                ->with('success', 'Commande créée avec succès.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()
+                ->with('error', 'Erreur lors de la création de la commande: ' . $e->getMessage());
+        }
     }
 
-    public function show(Commande $commande)
+    /**
+     * Affiche les détails d'une commande
+     */
+    public function show(Approvisionnement $commande)
     {
-        $commande->load(['fournisseur', 'details.produit.categorie', 'details.produit.uniteVente']);
+        $commande->load(['fournisseur', 'details.produit', 'user']);
+        
         return view('commandes.show', compact('commande'));
     }
 
-    public function edit(Commande $commande)
+    /**
+     * Affiche le formulaire de modification d'une commande
+     */
+    public function edit(Approvisionnement $commande)
     {
         if ($commande->statut !== 'en_attente') {
-            return redirect()
-                ->route('commandes.show', $commande)
-                ->with('error', 'Seules les commandes en attente peuvent être modifiées.');
+            return back()->with('error', 'Impossible de modifier une commande qui n\'est pas en attente.');
         }
 
-        $fournisseurs = Fournisseur::where('actif', true)
-            ->orderBy('nom')
-            ->get();
-
-        $produits = Produit::with(['categorie', 'uniteVente'])
-            ->where('actif', true)
-            ->orderBy('nom')
-            ->get();
-
-        $commande->load(['details']);
+        $fournisseurs = Fournisseur::where('actif', true)->get();
+        $produits = Produit::orderBy('nom')->get();
+        $commande->load('details.produit');
 
         return view('commandes.edit', compact('commande', 'fournisseurs', 'produits'));
     }
 
-    public function update(Request $request, Commande $commande)
+    /**
+     * Met à jour une commande
+     */
+    public function update(Request $request, Approvisionnement $commande)
     {
         if ($commande->statut !== 'en_attente') {
-            return redirect()
-                ->route('commandes.show', $commande)
-                ->with('error', 'Seules les commandes en attente peuvent être modifiées.');
+            return back()->with('error', 'Impossible de modifier une commande qui n\'est pas en attente.');
         }
 
-        // Validation améliorée pour vérifier les doublons de produits
         $validated = $request->validate([
             'fournisseur_id' => 'required|exists:fournisseurs,id',
             'date_commande' => 'required|date',
-            'date_livraison_prevue' => 'required|date|after_or_equal:date_commande',
+            'date_livraison_prevue' => 'nullable|date|after_or_equal:date_commande',
             'produits' => 'required|array|min:1',
-            'produits.*' => [
-                'required',
-                'exists:produits,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    // Vérifier s'il y a des doublons de produits
-                    $produits = $request->input('produits');
-                    if (count(array_keys($produits, $value)) > 1) {
-                        $fail('Le produit a été sélectionné plusieurs fois. Veuillez ajuster les quantités plutôt que de dupliquer le produit.');
-                    }
-                }
-            ],
-            'quantites' => 'required|array|min:1',
-            'quantites.*' => 'required|numeric|min:0.01',
-            'prix_unitaire' => 'required|array|min:1',
-            'prix_unitaire.*' => 'required|numeric|min:0.01',
-            'montant_total' => 'required|numeric|min:0',
-            'devise' => 'required|in:FCFA,EUR,USD',
+            'produits.*.produit_id' => 'required|exists:produits,id',
+            'produits.*.quantite' => 'required|numeric|min:1',
+            'produits.*.prix_unitaire' => 'required|numeric|min:0',
+            'notes' => 'nullable|string|max:500'
         ]);
 
-        // Utilisation d'une transaction explicite
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($commande, $validated) {
+        try {
+            DB::beginTransaction();
+
+            // Mettre à jour la commande
             $commande->update([
                 'fournisseur_id' => $validated['fournisseur_id'],
                 'date_commande' => $validated['date_commande'],
                 'date_livraison_prevue' => $validated['date_livraison_prevue'],
-                'montant_total' => $validated['montant_total'],
-                'devise' => $validated['devise'],
+                'notes' => $validated['notes'] ?? null
             ]);
 
             // Supprimer les anciens détails
             $commande->details()->delete();
 
             // Créer les nouveaux détails
-            foreach ($validated['produits'] as $index => $produitId) {
+            foreach ($validated['produits'] as $produit) {
                 $commande->details()->create([
-                    'produit_id' => $produitId,
-                    'quantite' => $validated['quantites'][$index],
-                    'prix_unitaire' => $validated['prix_unitaire'][$index],
-                    'montant_total' => $validated['quantites'][$index] * $validated['prix_unitaire'][$index],
+                    'produit_id' => $produit['produit_id'],
+                    'quantite' => $produit['quantite'],
+                    'prix_unitaire' => $produit['prix_unitaire'],
+                    'sous_total' => $produit['quantite'] * $produit['prix_unitaire']
                 ]);
             }
 
-            return redirect()
-                ->route('commandes.show', $commande)
-                ->with('success', 'La commande a été mise à jour avec succès.');
-        });
+            // Recalculer le montant total
+            $total = $commande->details->sum('sous_total');
+            $commande->update(['montant_total' => $total]);
+
+            DB::commit();
+
+            return redirect()->route('commandes.show', $commande)
+                ->with('success', 'Commande mise à jour avec succès.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()
+                ->with('error', 'Erreur lors de la mise à jour de la commande: ' . $e->getMessage());
+        }
     }
 
-    public function destroy(Commande $commande)
+    /**
+     * Supprime une commande
+     */
+    public function destroy(Approvisionnement $commande)
     {
         if ($commande->statut !== 'en_attente') {
-            return redirect()
-                ->route('commandes.show', $commande)
-                ->with('error', 'Seules les commandes en attente peuvent être supprimées.');
+            return back()->with('error', 'Impossible de supprimer une commande qui n\'est pas en attente.');
         }
 
-        $commande->details()->delete();
-        $commande->delete();
+        try {
+            DB::beginTransaction();
+            
+            // Supprimer les détails
+            $commande->details()->delete();
+            
+            // Supprimer la commande
+            $commande->delete();
 
-        return redirect()
-            ->route('commandes.index')
-            ->with('success', 'La commande a été supprimée avec succès.');
+            DB::commit();
+
+            return redirect()->route('commandes.index')
+                ->with('success', 'Commande supprimée avec succès.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Erreur lors de la suppression de la commande: ' . $e->getMessage());
+        }
     }
-}
+} 

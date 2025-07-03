@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fournisseurs', function (Blueprint $table) {
-            $table->boolean('actif')->default(true)->after('notes');
+            if (!Schema::hasColumn('fournisseurs', 'actif')) {
+                $table->boolean('actif')->default(true)->after('notes');
+            }
         });
     }
 
@@ -22,7 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('fournisseurs', function (Blueprint $table) {
-            //
+            if (Schema::hasColumn('fournisseurs', 'actif')) {
+                $table->dropColumn('actif');
+            }
         });
     }
 };

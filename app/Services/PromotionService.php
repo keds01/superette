@@ -19,10 +19,13 @@ class PromotionService
      */
     public function getActivePromotions()
     {
-        return Promotion::where('actif', true)
+        $query = Promotion::where('actif', true)
             ->where('date_debut', '<=', now())
-            ->where('date_fin', '>=', now())
-            ->get();
+            ->where('date_fin', '>=', now());
+            
+        // Le trait HasSuperette applique automatiquement le filtre par supérette
+        
+        return $query->get();
     }
     
     /**
@@ -181,6 +184,9 @@ class PromotionService
         
         $prixFinal = $totalPanier - $reduction;
         
+        // Récupération de la supérette active
+        $superetteId = session('active_superette_id');
+        
         // Création de l'enregistrement de remise
         $remise = Remise::create([
             'type' => $typeRemise,
@@ -190,7 +196,8 @@ class PromotionService
             'montant_final' => $prixFinal,
             'motif' => $motif,
             'date_remise' => now(),
-            'user_id' => $userIdResponsable
+            'user_id' => $userIdResponsable,
+            'superette_id' => $superetteId
         ]);
         
         return [

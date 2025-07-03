@@ -1,22 +1,123 @@
 <?php
-require '../vendor/autoload.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
-$app = require_once __DIR__.'/../bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
-// Instancier le service d'audit
-$auditService = app(\App\Services\AuditService::class);
+use App\Models\ActivityLog;
+use App\Models\User;
+use App\Models\Vente;
+use App\Models\Produit;
+use App\Models\MouvementStock;
+use Carbon\Carbon;
 
-echo "<h1>Diagnostic du service d'audit</h1>";
+echo "<h1>Debug Audit - Génération de données</h1>";
 
-// Vérifier les modèles et tables
-echo "<h2>1. Vérification des modèles et tables</h2>";
-echo "<ul>";
 try {
-    echo "<li>ActivityLog: " . (\App\Models\ActivityLog::count() ?? 'N/A') . " enregistrements</li>";
-} catch (\Exception $e) {
-    echo "<li style='color:red'>ActivityLog: ERREUR - " . $e->getMessage() . "</li>";
+    // Vérifier si des utilisateurs existent
+    $users = User::all();
+    if ($users->isEmpty()) {
+        echo "<p style='color: red;'>Aucun utilisateur trouvé. Impossible de créer des activités.</p>";
+        exit;
+    }
+
+    // Supprimer les anciennes activités d'exemple
+    ActivityLog::where('metadata', 'like', '%"exemple":true%')->delete();
+    echo "<p>✓ Anciennes activités d'exemple supprimées</p>";
+
+    // Créer des activités variées
+    $types = [
+        'connexion' => 'Connexion au système',
+        'modification' => 'Modification d\'un produit',
+        'creation' => 'Création d\'une nouvelle vente',
+        'suppression' => 'Suppression d\'un enregistrement',
+        'consultation' => 'Consultation du rapport',
+        'ajustement_stock' => 'Ajustement du stock',
+        'annulation_vente' => 'Annulation d\'une vente',
+        'export_data' => 'Export de données'
+    ];
+
+    $modelTypes = [
+        'App\Models\Produit',
+        'App\Models\Vente',
+        'App\Models\User',
+        'App\Models\Stock',
+        'App\Models\Client'
+    ];
+
+    $activitesCreees = 0;
+    
+    for ($i = 0; $i < 25; $i++) {
+        $user = $users->random();
+        $typeKeys = array_keys($types);
+        $typeIndex = array_rand($typeKeys);
+        $typeName = $typeKeys[$typeIndex];
+        $description = $types[$typeName];
+        $modelType = $modelTypes[array_rand($modelTypes)];
+        
+        // Date aléatoire dans les 7 derniers jours
+        $date = Carbon::now()->subDays(rand(0, 7))->subHours(rand(0, 23))->subMinutes(rand(0, 59));
+        
+        ActivityLog::create([
+            'type' => $typeName,
+            'description' => $description,
+            'user_id' => $user->id,
+            'model_type' => $modelType,
+            'model_id' => rand(1, 100),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'metadata' => json_encode([
+                'exemple' => true,
+                'generated_at' => now()->toISOString(),
+                'session_id' => 'session_' . rand(1000, 9999)
+            ]),
+            'created_at' => $date,
+            'updated_at' => $date
+        ]);
+        
+        $activitesCreees++;
+    }
+
+    echo "<p>✓ {$activitesCreees} activités créées</p>";
+
+    // Statistiques
+    $totalActivites = ActivityLog::count();
+    $activitesAujourdHui = ActivityLog::whereDate('created_at', today())->count();
+    $activitesCeMois = ActivityLog::whereMonth('created_at', now()->month)->count();
+
+    echo "<h2>Statistiques</h2>";
+    echo "<ul>";
+    echo "<li>Total activités: {$totalActivites}</li>";
+    echo "<li>Activités aujourd'hui: {$activitesAujourdHui}</li>";
+    echo "<li>Activités ce mois: {$activitesCeMois}</li>";
+    echo "</ul>";
+
+    // Dernières activités
+    echo "<h2>Dernières activités</h2>";
+    $dernieresActivites = ActivityLog::with('user')->latest()->take(5)->get();
+    
+    echo "<table border='1' style='border-collapse: collapse; width: 100%;'>";
+    echo "<tr><th>Type</th><th>Description</th><th>Utilisateur</th><th>Date</th></tr>";
+    
+    foreach ($dernieresActivites as $activite) {
+        echo "<tr>";
+        echo "<td>{$activite->type}</td>";
+        echo "<td>{$activite->description}</td>";
+        echo "<td>" . ($activite->user ? $activite->user->name : 'Système') . "</td>";
+        echo "<td>{$activite->created_at->format('d/m/Y H:i')}</td>";
+        echo "</tr>";
+    }
+    
+    echo "</table>";
+
+    echo "<h2>Test de la page d'audit</h2>";
+    echo "<p><a href='/audit' target='_blank'>Cliquer ici pour ouvrir la page d'audit</a></p>";
+
+} catch (Exception $e) {
+    echo "<p style='color: red;'>Erreur: " . $e->getMessage() . "</p>";
+    echo "<p>Trace: " . $e->getTraceAsString() . "</p>";
 }
+?>
 
 try {
     echo "<li>Produit: " . (\App\Models\Produit::count() ?? 'N/A') . " enregistrements</li>";

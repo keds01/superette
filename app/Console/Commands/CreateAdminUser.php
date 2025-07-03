@@ -44,7 +44,7 @@ class CreateAdminUser extends Command
         );
 
         // Attacher le rôle admin à l'utilisateur
-        if (!$user->hasRole('admin')) {
+        if (!$user->hasRole(['admin', 'super_admin'])) {
             $user->roles()->attach($adminRole->id);
             $this->info("Rôle 'admin' attribué à l'utilisateur {$email}.");
         }

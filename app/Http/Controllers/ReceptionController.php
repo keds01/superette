@@ -149,7 +149,7 @@ class ReceptionController extends Controller
                 'numero_facture' => $validated['numero_facture'],
                 'mode_paiement' => $validated['mode_paiement'],
                 'description' => $validated['description'],
-                'statut' => 'en_cours'
+                'statut' => Reception::STATUT_TERMINEE
             ]);
 
             // Créer les détails de réception
@@ -218,18 +218,47 @@ class ReceptionController extends Controller
                 ->with('error', 'Cette réception ne peut plus être modifiée.');
         }
 
-        $validated = $request->validate([
-            'fournisseur_id' => 'required|exists:fournisseurs,id',
-            'date_reception' => 'required|date',
-            'numero_facture' => 'nullable|string|max:50',
-            'mode_paiement' => 'required|in:especes,cheque,virement,autre',
-            'description' => 'nullable|string',
-            'produits' => 'required|array|min:1',
-            'produits.*.produit_id' => 'required|exists:produits,id',
-            'produits.*.quantite' => 'required|numeric|min:0.01',
-            'produits.*.prix_unitaire' => 'required|numeric|min:0',
-            'produits.*.date_peremption' => 'nullable|date|after:today'
-        ]);
+        // On accepte soit 'produits' (création), soit 'details' (édition)
+        if ($request->has('produits')) {
+            $validated = $request->validate([
+                'fournisseur_id' => 'required|exists:fournisseurs,id',
+                'date_reception' => 'required|date',
+                'numero_facture' => 'nullable|string|max:50',
+                'mode_paiement' => 'required|in:especes,cheque,virement,autre',
+                'description' => 'nullable|string',
+                'produits' => 'required|array|min:1',
+                'produits.*.produit_id' => 'required|exists:produits,id',
+                'produits.*.quantite' => 'required|numeric|min:0.01',
+                'produits.*.prix_unitaire' => 'required|numeric|min:0',
+                'produits.*.date_peremption' => 'nullable|date|after:today'
+            ]);
+            $produits = $validated['produits'];
+        } else {
+            $validated = $request->validate([
+                'fournisseur_id' => 'required|exists:fournisseurs,id',
+                'date_reception' => 'required|date',
+                'numero_facture' => 'nullable|string|max:50',
+                'mode_paiement' => 'required|in:especes,cheque,virement,autre',
+                'description' => 'nullable|string',
+                'details' => 'required|array|min:1',
+                'details.*.quantite' => 'required|numeric|min:0.01',
+                'details.*.prix_unitaire' => 'required|numeric|min:0',
+                'details.*.date_peremption' => 'nullable|date|after:today'
+            ]);
+            // Reconstruire $produits à partir de $reception->details et des inputs
+            $produits = [];
+            foreach ($reception->details as $detail) {
+                $id = $detail->id;
+                if (isset($validated['details'][$id])) {
+                    $produits[] = [
+                        'produit_id' => $detail->produit_id,
+                        'quantite' => $validated['details'][$id]['quantite'],
+                        'prix_unitaire' => $validated['details'][$id]['prix_unitaire'],
+                        'date_peremption' => $validated['details'][$id]['date_peremption'] ?? null
+                    ];
+                }
+            }
+        }
 
         try {
             DB::beginTransaction();
@@ -247,9 +276,10 @@ class ReceptionController extends Controller
             $reception->update([
                 'fournisseur_id' => $validated['fournisseur_id'],
                 'date_reception' => $validated['date_reception'],
-                'numero_facture' => $validated['numero_facture'],
+                'numero_facture' => $validated['numero_facture'] ?? null,
                 'mode_paiement' => $validated['mode_paiement'],
-                'description' => $validated['description']
+                'description' => $validated['description'] ?? null,
+                'statut' => Reception::STATUT_TERMINEE
             ]);
 
             // Créer les nouveaux détails

@@ -50,12 +50,12 @@ class ClientController extends Controller
         // Calculer les statistiques des ventes
         $ventesCollection = $client->ventes;
         $ventes_count = $ventesCollection->count();
-        $ventes_sum_montant_net = $ventesCollection->sum('montant_net');
+        $ventes_sum_montant_total = $ventesCollection->sum('montant_total');
         
         // Obtenir la date de la dernière vente (sera une instance de Carbon ou null)
         $derniere_vente_date = $ventesCollection->first()?->date_vente;
         
-        return view('clients.show', compact('client', 'ventes_count', 'ventes_sum_montant_net', 'derniere_vente_date'));
+        return view('clients.show', compact('client', 'ventes_count', 'ventes_sum_montant_total', 'derniere_vente_date'));
     }
 
     /**

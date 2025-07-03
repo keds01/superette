@@ -94,7 +94,8 @@ class StockService
                 'prix_unitaire' => $prixUnitaire,
                 'created_at' => now(),
                 'motif' => $motif,
-                'date_peremption' => $datePeremption
+                'date_peremption' => $datePeremption,
+                'superette_id' => $produit->superette_id ?? session('active_superette_id') ?? (auth()->check() ? auth()->user()->superette_id : 1)
             ]);
             
             // Vérification des alertes de stock pour ce produit
@@ -139,7 +140,8 @@ class StockService
                 'quantite' => $totalUnites,
                 'prix_unitaire' => $produit->prix_achat_ht,
                 'created_at' => now(),
-                'motif' => $motif
+                'motif' => $motif,
+                'superette_id' => $produit->superette_id ?? session('active_superette_id') ?? (auth()->check() ? auth()->user()->superette_id : 1)
             ]);
             
             // Vérification des alertes de stock pour ce produit
@@ -180,7 +182,8 @@ class StockService
                 'quantite' => abs($difference),
                 'prix_unitaire' => $produit->prix_achat_ht,
                 'created_at' => now(),
-                'motif' => $motif
+                'motif' => $motif,
+                'superette_id' => $produit->superette_id ?? session('active_superette_id') ?? (auth()->check() ? auth()->user()->superette_id : 1)
             ]);
             
             // Vérification des alertes de stock pour ce produit

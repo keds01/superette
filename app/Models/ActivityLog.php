@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasSuperette;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ActivityLog extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSuperette;
 
     protected $fillable = [
         'type',
@@ -17,7 +18,8 @@ class ActivityLog extends Model
         'model_id',
         'ip_address',
         'user_agent',
-        'metadata'
+        'metadata',
+        'superette_id'
     ];
 
     protected $casts = [

@@ -1,5 +1,3 @@
-
-
 @extends('layouts.app')
 
 @section('title', 'Administration du système')
@@ -77,7 +75,7 @@
         <!-- Navigation des sections admin -->
         <!-- Lien unique vers la gestion des utilisateurs -->
         <div class="mb-8">
-            <a href="{{ route('admin.users.index') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+            <a href="{{ route('users.index') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
                 <i class="fas fa-users"></i>
                 Gérer les utilisateurs
             </a>

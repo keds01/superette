@@ -193,7 +193,50 @@ class StockMovementController extends Controller
 
     public function show(MouvementStock $stockMovement)
     {
-        $stockMovement->load(['produit.categorie', 'produit.uniteVente', 'utilisateur']);
+        \Illuminate\Support\Facades\Log::info('--- Debug Mouvement Stock ---');
+        \Illuminate\Support\Facades\Log::info('Mouvement ID: ' . $stockMovement->id);
+        \Illuminate\Support\Facades\Log::info('Produit ID from Mouvement: ' . $stockMovement->produit_id);
+
+        $produitManuellement = \App\Models\Produit::withTrashed()->find($stockMovement->produit_id);
+        \Illuminate\Support\Facades\Log::info('Produit trouvé manuellement: ' . ($produitManuellement ? 'OUI' : 'NON'));
+
+        // Si le produit est trouvé manuellement mais pas via la relation, on l'attribue directement
+        if ($produitManuellement) {
+            // Forcer l'attribution du produit à la relation
+            $stockMovement->produit = $produitManuellement;
+            
+            // Forcer le chargement des relations du produit
+            if ($produitManuellement->categorie_id) {
+                $produitManuellement->load('categorie');
+            }
+            
+            if ($produitManuellement->unite_vente_id) {
+                $produitManuellement->load('uniteVente');
+            }
+            
+            \Illuminate\Support\Facades\Log::info('Produit assigné manuellement: ' . $produitManuellement->nom);
+        } else {
+            // On doit recharger la relation car un accès précédent pourrait l'avoir mise en cache à null
+            $stockMovement->load('produit');
+            $produitViaRelation = $stockMovement->produit;
+            \Illuminate\Support\Facades\Log::info('Produit via relation est null: ' . (is_null($produitViaRelation) ? 'OUI' : 'NON'));
+
+            if (is_null($produitViaRelation)) {
+                \Illuminate\Support\Facades\Log::warning('!!! Incohérence: Le produit ID ' . $stockMovement->produit_id . ' n\'a pas été trouvé.');
+            }
+        }
+
+        // On charge les autres relations nécessaires
+        $stockMovement->load(['utilisateur']);
+        
+        // Vérification finale des données avant envoi à la vue
+        \Illuminate\Support\Facades\Log::info('Produit avant envoi à la vue: ' . ($stockMovement->produit ? 'OUI' : 'NON'));
+        if ($stockMovement->produit) {
+            \Illuminate\Support\Facades\Log::info('Nom du produit: ' . $stockMovement->produit->nom);
+            \Illuminate\Support\Facades\Log::info('Catégorie chargée: ' . ($stockMovement->produit->categorie ? 'OUI' : 'NON'));
+            \Illuminate\Support\Facades\Log::info('Unité chargée: ' . ($stockMovement->produit->uniteVente ? 'OUI' : 'NON'));
+        }
+        
         return view('stock-movements.show', compact('stockMovement'));
     }
 
@@ -235,4 +278,35 @@ class StockMovementController extends Controller
             return back()->with('error', 'Erreur lors de l\'annulation du mouvement : ' . $e->getMessage());
         }
     }
-} 
+
+    /**
+     * Recréer un mouvement de stock supprimé
+     */
+    public function recreate($id = 2)
+    {
+        try {
+            DB::beginTransaction();
+            
+            // Création d'un nouveau mouvement de stock avec les données par défaut
+            $mouvement = new MouvementStock();
+            $mouvement->produit_id = 8; // ID du produit CAGE
+            $mouvement->type = 'entree';
+            $mouvement->quantite_avant_conditionnement = 0;
+            $mouvement->quantite_apres_conditionnement = 100;
+            $mouvement->quantite_avant_unite = 0;
+            $mouvement->quantite_apres_unite = 100;
+            $mouvement->motif = 'Recréation du mouvement de stock';
+            $mouvement->date_mouvement = now();
+            $mouvement->save();
+            
+            DB::commit();
+            
+            return redirect()
+                ->route('mouvements-stock.show', $mouvement->id)
+                ->with('success', 'Mouvement de stock recréé avec succès.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Erreur lors de la recréation du mouvement : ' . $e->getMessage());
+        }
+    }
+}

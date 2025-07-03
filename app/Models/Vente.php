@@ -2,22 +2,24 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Vente extends Model
 {
+    use HasFactory, SoftDeletes;
+
     // Statuts possibles pour une vente
     const STATUT_EN_COURS = 'en_cours';
     const STATUT_TERMINEE = 'terminee';
     const STATUT_ANNULEE = 'annulee';
 
-    use SoftDeletes;
-
     protected $fillable = [
         'numero_vente',
         'client_id',
         'employe_id',
+        'superette_id',
         'date_vente',
         'type_vente',
         'montant_total',
@@ -71,6 +73,11 @@ class Vente extends Model
         return $this->belongsTo(Employe::class);
     }
 
+    public function superette()
+    {
+        return $this->belongsTo(Superette::class);
+    }
+
     public function details()
     {
         return $this->hasMany(DetailVente::class);
@@ -79,6 +86,14 @@ class Vente extends Model
     public function paiements()
     {
         return $this->hasMany(Paiement::class);
+    }
+
+    /**
+     * Remises appliquées à cette vente
+     */
+    public function remises()
+    {
+        return $this->hasMany(\App\Models\Remise::class);
     }
 
     // Événements

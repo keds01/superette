@@ -45,11 +45,30 @@
                         </span>
                     </div>
                 </div>
+                <div>
+                    <label for="superette_id" class="block text-sm font-medium text-gray-700 mb-1">Superette</label>
+                    <div class="relative">
+                        <select name="superette_id" id="superette_id" 
+                            class="w-full rounded-xl border-indigo-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-4 py-3 text-gray-900 shadow-sm">
+                            <option value="">Aucune (Super Admin)</option>
+                            @foreach(App\Models\Superette::orderBy('nom')->get() as $superette)
+                                <option value="{{ $superette->id }}" {{ old('superette_id', $user->superette_id) == $superette->id ? 'selected' : '' }}>
+                                    {{ $superette->nom }} ({{ $superette->code }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <span class="absolute right-3 top-3.5 text-indigo-400">
+                            <i class="fas fa-store"></i>
+                        </span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Laisser vide uniquement pour les Super Administrateurs. Les utilisateurs standards doivent être affectés à une superette.</p>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe</label>
                         <div class="relative">
                             <input type="password" name="password" id="password"
+                                autocomplete="new-password"
                                 class="w-full rounded-xl border-indigo-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-4 py-3 text-gray-900 shadow-sm placeholder-gray-400">
                             <span class="absolute right-3 top-3.5 text-indigo-400">
                                 <i class="fas fa-lock"></i>
@@ -61,6 +80,7 @@
                         <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-1">Confirmation du mot de passe</label>
                         <div class="relative">
                             <input type="password" name="password_confirmation" id="password_confirmation"
+                                autocomplete="new-password"
                                 class="w-full rounded-xl border-indigo-200 focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-4 py-3 text-gray-900 shadow-sm placeholder-gray-400">
                             <span class="absolute right-3 top-3.5 text-indigo-400">
                                 <i class="fas fa-lock"></i>

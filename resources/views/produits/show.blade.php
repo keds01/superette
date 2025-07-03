@@ -17,11 +17,19 @@
                         <p class="mt-2 text-lg text-gray-500">{{ $produit->nom }}</p>
                     </div>
                     <div class="flex gap-3">
-                        <a href="{{ route('produits.edit', $produit) }}" 
-                           class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-semibold shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
-                            <i class="fas fa-edit"></i>
-                            Modifier
-                        </a>
+                        @php
+                            $user = auth()->user();
+                            $estCaissier = $user && $user->isCaissier();
+                            $isAuthorized = $user && ($user->isAdmin() || $user->isSuperAdmin() || $user->isResponsable());
+                        @endphp
+                        
+                        @if($isAuthorized)
+                            <a href="{{ route('produits.edit', $produit) }}" 
+                               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-semibold shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                                <i class="fas fa-edit"></i>
+                                Modifier
+                            </a>
+                        @endif
                         <a href="{{ route('produits.index') }}" 
                            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-semibold shadow-sm hover:bg-indigo-50 transition-all duration-200">
                             <i class="fas fa-arrow-left"></i>
@@ -149,17 +157,11 @@
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-sm font-medium text-gray-500">Prix de vente HT</p>
+                                        <p class="text-sm font-medium text-gray-500">Prix de vente TTC</p>
                                         <p class="mt-1 text-2xl font-bold text-indigo-600">
-                                            {{ number_format($produit->prix_vente_ht, 0, ',', ' ') }} FCFA
+                                            {{ number_format($produit->prix_vente_ttc, 0, ',', ' ') }} FCFA
                                         </p>
                                     </div>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-500">Marge</p>
-                                    <p class="mt-1 text-xl font-semibold text-indigo-600">
-                                        {{ number_format($produit->marge, 2) }}%
-                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -210,6 +212,43 @@
                             </div>
                         @else
                             <p class="text-center text-gray-500 py-4">Aucun mouvement de stock enregistré</p>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Tarifs par conditionnement -->
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Tarifs par conditionnement
+                        </h3>
+                        
+                        @if($produit->conditionnements->count())
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-indigo-100">
+                                <thead class="bg-indigo-50/50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-indigo-500 uppercase tracking-wider">Type</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-indigo-500 uppercase tracking-wider">Quantité</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-indigo-500 uppercase tracking-wider">Prix</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-indigo-100">
+                                    @foreach($produit->conditionnements as $cond)
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ ucfirst($cond->type) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $cond->quantite }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-700 font-bold">{{ number_format($cond->prix, 0, ',', ' ') }} FCFA</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @else
+                        <div class="text-gray-400 italic">Aucun conditionnement défini pour ce produit.</div>
                         @endif
                     </div>
                 </div>
@@ -265,6 +304,7 @@
                     </div>
                 </div>
 
+                @if($isAuthorized)
                 <!-- Actions rapides -->
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
@@ -285,14 +325,17 @@
                                 <i class="fas fa-minus"></i>
                                 Retirer du stock
                             </a>
+                            @if($user && ($user->isAdmin() || $user->isSuperAdmin()))
                             <a href="{{ route('promotions.create', ['product_id' => $produit->id]) }}" 
                                class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-tr from-yellow-600 to-orange-500 text-white font-semibold shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
                                 <i class="fas fa-tag"></i>
                                 Créer une promotion
                             </a>
+                            @endif
                         </div>
                     </div>
                 </div>
+                @endif
             </div>
         </div>
     </div>

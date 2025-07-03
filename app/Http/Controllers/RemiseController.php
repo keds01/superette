@@ -49,22 +49,48 @@ class RemiseController extends Controller
     }
 
     /**
-     * Affiche la liste des remises
+     * Affiche la liste des remises avec filtres
      */
     public function index(Request $request)
     {
         try {
-            // Version simplifiée et sécurisée pour résoudre le problème de page blanche
-            $remises = Remise::orderBy('created_at', 'desc')->paginate(10);
-            
-            return view('remises.index', ['remises' => $remises]);
+            $query = Remise::with('vente')->orderBy('created_at', 'desc');
+
+            // Appliquer les filtres
+            if ($request->has('search') && !empty($request->search)) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('code_remise', 'LIKE', "%{$search}%")
+                        ->orWhere('description', 'LIKE', "%{$search}%")
+                        ->orWhereHas('vente', function($q) use ($search) {
+                            $q->where('id', 'LIKE', "%{$search}%");
+                        });
+                });
+            }
+
+            if ($request->has('type') && !empty($request->type)) {
+                $query->where('type_remise', $request->type);
+            }
+
+            if ($request->has('statut')) {
+                if ($request->statut == 'active') {
+                    $query->where('actif', true);
+                } elseif ($request->statut == 'inactive') {
+                    $query->where('actif', false);
+                }
+            }
+
+            // Filtrage par superette si nécessaire (multi-superette)
+            if (session()->has('active_superette_id')) {
+                $query->whereHas('vente', function($q) {
+                    $q->where('superette_id', session('active_superette_id'));
+                });
+            }
+
+            $remises = $query->paginate(15);
+            return view('remises.index', compact('remises'));
         } catch (\Exception $e) {
-            // Déboguer le problème en affichant directement l'erreur
-            return response()->view('errors.custom', [
-                'title' => 'Erreur lors du chargement des remises',
-                'message' => $e->getMessage(),
-                'exception' => $e
-            ], 500);
+            return back()->with('error', "Erreur lors du chargement des remises: {$e->getMessage()}");
         }
     }
 
@@ -101,7 +127,8 @@ class RemiseController extends Controller
                 'type_remise' => $request->type_remise,
                 'valeur_remise' => $request->valeur_remise,
                 'code_remise' => $request->code_remise,
-                'description' => $request->description
+                'description' => $request->description,
+                'actif' => true
             ]);
 
             $vente->remises()->save($remise);
@@ -217,5 +244,63 @@ class RemiseController extends Controller
                 'description' => $remise->description
             ]
         ]);
+    }
+
+    /**
+     * Affiche la sélection de vente avant création de remise
+     */
+    public function selectVente(Request $request)
+    {
+        $query = Vente::where('statut', '!=', Vente::STATUT_ANNULEE);
+        
+        // Filtrage par superette active (multi-superette)
+        if (session()->has('active_superette_id')) {
+            $query->where('superette_id', session('active_superette_id'));
+        }
+        
+        // Recherche
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'LIKE', "%{$search}%")
+                    ->orWhereHas('client', function($q) use ($search) {
+                        $q->where('nom', 'LIKE', "%{$search}%")
+                            ->orWhere('prenom', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+        
+        // Filtrage par date
+        if ($request->has('date_debut') && !empty($request->date_debut)) {
+            $query->whereDate('created_at', '>=', $request->date_debut);
+        }
+        
+        if ($request->has('date_fin') && !empty($request->date_fin)) {
+            $query->whereDate('created_at', '<=', $request->date_fin);
+        }
+        
+        // Filtrage par montant
+        if ($request->has('montant_min') && !empty($request->montant_min)) {
+            $query->where('montant_total', '>=', $request->montant_min);
+        }
+        
+        // Charger les relations et paginer
+        $ventes = $query->with('client')
+                      ->orderBy('created_at', 'desc')
+                      ->paginate(20);
+        
+        return view('remises.select-vente', compact('ventes'));
+    }
+
+    /**
+     * Affiche le formulaire de création de remise pour une vente donnée
+     */
+    public function createForVente(\App\Models\Vente $vente)
+    {
+        $types_remise = [
+            \App\Models\Remise::TYPE_POURCENTAGE => 'Pourcentage',
+            \App\Models\Remise::TYPE_MONTANT_FIXE => 'Montant fixe'
+        ];
+        return view('remises.create', compact('types_remise', 'vente'));
     }
 } 

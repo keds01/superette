@@ -41,6 +41,9 @@ class AlerteController extends Controller
             } elseif ($request->statut === 'declenchee') {
                 $query->where('estDeclenchee', true);
             }
+        } else {
+            // Par défaut, n'afficher que les alertes déclenchées
+            $query->where('estDeclenchee', true);
         }
 
         if ($request->filled('tri')) {
@@ -62,10 +65,28 @@ class AlerteController extends Controller
             }
         }
 
-        $alertes = $query->paginate(10)->withQueryString();
+        $alertesQuery = $query;
+        // Si aucun filtre statut, filtrer dynamiquement sur l'état déclenché (méthode estDeclenchee)
+        if (!$request->filled('statut')) {
+            $alertesCollection = $alertesQuery->get();
+            $filtered = $alertesCollection->filter(fn($a) => $a->estDeclenchee());
+            $page = $request->input('page', 1);
+            $perPage = 10;
+            $alertes = new \Illuminate\Pagination\LengthAwarePaginator(
+                $filtered->forPage($page, $perPage)->values(),
+                $filtered->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        } else {
+            $alertes = $alertesQuery->paginate(10)->withQueryString();
+        }
+
+        // Historique (uniquement déclenchées)
         $historiqueAlertes = Alerte::with(['produit.categorie', 'produit.uniteVente'])
-            ->where('estDeclenchee', true)
-            ->orderBy('created_at', 'desc')
+            ->where(function($q){ $q->where('type','like','stock%')->orWhere('type','like','peremption%'); })
+            ->orderBy('created_at','desc')
             ->paginate(10);
 
         // Récupération des produits pour le formulaire de création
@@ -103,6 +124,20 @@ class AlerteController extends Controller
             }
         }
 
+        // Ajouter automatiquement la superette active
+        // Utiliser active_superette_id qui est défini par le middleware CheckSuperetteSelected
+        $validated['superette_id'] = session('active_superette_id');
+        
+        // Si pour une raison quelconque la superette_id n'est pas dans la session, utiliser celle de l'utilisateur
+        if (!$validated['superette_id'] && auth()->check() && auth()->user()->superette_id) {
+            $validated['superette_id'] = auth()->user()->superette_id;
+        }
+        
+        // Si toujours pas de superette_id, utiliser la superette par défaut (ID 1)
+        if (!$validated['superette_id']) {
+            $validated['superette_id'] = 1; // Superette par défaut
+        }
+
         $alerte = Alerte::create($validated);
 
         return redirect()->route('alertes.index')
@@ -115,6 +150,23 @@ class AlerteController extends Controller
             'seuil' => 'required|numeric|min:0',
             'message' => 'nullable|string|max:255'
         ]);
+
+        // S'assurer que la superette_id reste celle de l'alerte existante
+        // ou utiliser celle de la session si l'alerte n'en a pas
+        if (!$alerte->superette_id) {
+            // Utiliser active_superette_id qui est défini par le middleware CheckSuperetteSelected
+            $validated['superette_id'] = session('active_superette_id');
+            
+            // Si pour une raison quelconque la superette_id n'est pas dans la session, utiliser celle de l'utilisateur
+            if (!$validated['superette_id'] && auth()->check() && auth()->user()->superette_id) {
+                $validated['superette_id'] = auth()->user()->superette_id;
+            }
+            
+            // Si toujours pas de superette_id, utiliser la superette par défaut (ID 1)
+            if (!$validated['superette_id']) {
+                $validated['superette_id'] = 1; // Superette par défaut
+            }
+        }
 
         $alerte->update($validated);
 
@@ -134,6 +186,15 @@ class AlerteController extends Controller
     {
         $alertes = Alerte::with('produit')->get();
         $alertesDeclenchees = [];
+        
+        // Récupérer la superette active de manière robuste
+        $superetteId = session('active_superette_id');
+        if (!$superetteId && auth()->check() && auth()->user()->superette_id) {
+            $superetteId = auth()->user()->superette_id;
+        }
+        if (!$superetteId) {
+            $superetteId = 1; // Superette par défaut
+        }
 
         // Vérification des alertes configurées
         foreach ($alertes as $alerte) {
@@ -153,7 +214,10 @@ class AlerteController extends Controller
             }
 
             if ($estDeclenchee && !$alerte->estDeclenchee) {
-                $alerte->update(['estDeclenchee' => true]);
+                $alerte->update([
+                    'estDeclenchee' => true,
+                    'superette_id' => $alerte->superette_id ?? $superetteId
+                ]);
                 $alertesDeclenchees[] = [
                     'produit' => $produit->nom,
                     'type' => $alerte->type,
@@ -186,7 +250,8 @@ class AlerteController extends Controller
                         'seuil' => $produit->seuil_alerte,
                         'message' => "Le stock de {$produit->nom} est inférieur au seuil minimum ({$produit->seuil_alerte})",
                         'estDeclenchee' => true,
-                        'actif' => true
+                        'actif' => true,
+                        'superette_id' => $superetteId
                     ]
                 );
                 
@@ -210,7 +275,8 @@ class AlerteController extends Controller
                         'message' => "Le produit {$produit->nom} va expirer dans {$joursRestants} jour(s)",
                         'estDeclenchee' => true,
                         'actif' => true,
-                        'date_peremption' => $produit->date_peremption
+                        'date_peremption' => $produit->date_peremption,
+                        'superette_id' => $superetteId
                     ]
                 );
                 

@@ -56,9 +56,13 @@
                         <td class="px-6 py-4 whitespace-nowrap">{{ $user->email }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">{{ $user->telephone ?? 'Non renseigné' }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            @foreach($user->roles as $role)
-                                <span class="inline-block px-3 py-1 rounded-full bg-gradient-to-tr from-indigo-200 to-pink-100 text-indigo-800 text-xs font-bold mr-2">{{ $role->nom }}</span>
-                            @endforeach
+                            @if($user->role === 'super_admin')
+                                <span class="inline-block px-3 py-1 rounded-full bg-purple-200 text-purple-800 text-xs font-bold mr-2">Super Administrateur</span>
+                            @elseif($user->role === 'admin')
+                                <span class="inline-block px-3 py-1 rounded-full bg-indigo-200 text-indigo-800 text-xs font-bold mr-2">Administrateur</span>
+                            @else
+                                <span class="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-800 text-xs font-bold mr-2">{{ $user->role }}</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             @if($user->actif)

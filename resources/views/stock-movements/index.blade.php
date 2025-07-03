@@ -117,10 +117,10 @@
                                             {{ $movement->created_at->format('d/m/Y H:i') }}
                                         </td>
                                         <td class="whitespace-nowrap px-3 py-4 text-sm text-indigo-900">
-                                            @if($movement->product)
-                                                <div class="font-medium">{{ $movement->product->nom }}</div>
+                                            @if($movement->produit)
+                                                <div class="font-medium">{{ $movement->produit->nom }}</div>
                                                 <div class="text-gray-500">
-                                                    {{ $movement->product->categorie ? $movement->product->categorie->nom : 'Catégorie inconnue' }}
+                                                    {{ $movement->produit->categorie ? $movement->produit->categorie->nom : 'Catégorie inconnue' }}
                                                 </div>
                                             @else
                                                 <div class="font-medium text-red-600">Produit supprimé</div>
@@ -139,8 +139,11 @@
                                             @endif
                                         </td>
                                         <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                            @if($movement->product)
-                                                {{ number_format($movement->quantite_avant_conditionnement, 2) }} {{ $movement->product->uniteVente ? $movement->product->uniteVente->symbole : 'unité' }}
+                                            @if($movement->produit)
+                                                @php
+                                                    $quantiteMouvement = $movement->quantite_apres_conditionnement - $movement->quantite_avant_conditionnement;
+                                                @endphp
+                                                {{ number_format(abs($quantiteMouvement), 2) }} {{ $movement->produit->uniteVente ? $movement->produit->uniteVente->symbole : 'unité' }}
                                             @else
                                                 {{ number_format($movement->quantite_avant_conditionnement, 2) }} unité
                                             @endif

@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Client extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'clients';
 
@@ -38,5 +39,19 @@ class Client extends Model
     public function paiements(): HasMany
     {
         return $this->hasMany(Paiement::class);
+    }
+
+    public function getNomCompletAttribute()
+    {
+        return "{$this->nom} {$this->prenom}";
+    }
+
+    public function scopeRecherche($query, $terme)
+    {
+        return $query->where('nom', 'like', "%{$terme}%")
+                    ->orWhere('prenom', 'like', "%{$terme}%")
+                    ->orWhere('telephone', 'like', "%{$terme}%")
+                    ->orWhere('email', 'like', "%{$terme}%")
+                    ->orWhere('code', 'like', "%{$terme}%");
     }
 }

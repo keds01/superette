@@ -9,6 +9,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Reception extends Model
 {
+    // Constantes de statuts
+    public const STATUT_EN_COURS = 'en_cours';
+    public const STATUT_TERMINEE = 'terminee';
+    public const STATUT_ANNULEE = 'annulee';
+
+    /**
+     * Marquer la réception comme terminée.
+     * @return void
+     */
+    public function markAsTerminee(): void
+    {
+        $this->statut = self::STATUT_TERMINEE;
+        $this->save();
+    }
+
     use HasFactory;
     protected $fillable = [
         'numero',
@@ -20,6 +35,7 @@ class Reception extends Model
         'description',
         'statut'
     ];
+
 
     protected $casts = [
         'date_reception' => 'datetime',

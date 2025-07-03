@@ -48,7 +48,10 @@
         </div>
 
         <!-- Tableau des promotions -->
-        <div class="bg-white rounded-2xl shadow-2xl p-6 mb-8">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 mb-8 mt-8 flow-root">
+            <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                    <div class="overflow-hidden">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-indigo-100">
                     <tr>
@@ -128,6 +131,9 @@
                     @endforelse
                 </tbody>
             </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Pagination -->

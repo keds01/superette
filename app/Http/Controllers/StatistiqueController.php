@@ -25,11 +25,19 @@ class StatistiqueController extends Controller
         $dateDebut = $request->date_debut ? Carbon::parse($request->date_debut) : Carbon::now()->startOfMonth();
         $dateFin = $request->date_fin ? Carbon::parse($request->date_fin)->endOfDay() : Carbon::now()->endOfDay();
         $periode = $request->periode ?? 'jour';
+        
+        // Récupération de la superette active
+        $superetteId = session('active_superette_id');
 
         // Construction de la requête de base
         $query = Vente::query()
-            ->whereBetween('created_at', [$dateDebut, $dateFin])
-            ->where('statut', 'completee');
+            ->whereBetween(DB::raw('COALESCE(date_vente, created_at)'), [$dateDebut, $dateFin])
+            ->whereIn('statut', ['completee', 'terminee']);
+            
+        // Filtrer par superette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
 
         // Calcul des statistiques générales avec des valeurs par défaut
         $chiffreAffaires = $query->sum('montant_total') ?? 0;
@@ -37,25 +45,37 @@ class StatistiqueController extends Controller
         $panierMoyen = $nombreVentes > 0 ? $chiffreAffaires / $nombreVentes : 0;
 
         // Évolution des ventes selon la période
-        $evolutionVentes = $this->getEvolutionVentes($dateDebut, $dateFin, $periode) ?? collect();
+        $evolutionVentes = $this->getEvolutionVentes($dateDebut, $dateFin, $periode, $superetteId) ?? collect();
 
         // Répartition des modes de paiement
-        $modesPaiement = Paiement::query()
+        $paiementsQuery = Paiement::query()
             ->valides() // Scope pour statut = 'valide'
-            ->whereBetween('date_paiement', [$dateDebut, $dateFin]) // Filtrer par la date du paiement
-            ->select('mode_paiement', DB::raw('SUM(montant) as montant')) // Assurez-vous que l'alias correspond à ce que la vue attend
+            ->whereBetween('date_paiement', [$dateDebut, $dateFin]); // Filtrer par la date du paiement
+            
+        // Filtrer par superette si spécifiée
+        if ($superetteId) {
+            $paiementsQuery->where('superette_id', $superetteId);
+        }
+        
+        $modesPaiement = $paiementsQuery->select('mode_paiement', DB::raw('SUM(montant) as montant')) // Assurez-vous que l'alias correspond à ce que la vue attend
             ->groupBy('mode_paiement')
             ->get();
 
         // Top 10 des produits les plus vendus avec une valeur par défaut
-        $topProduits = DetailVente::query()
+        $topProduitsQuery = DetailVente::query()
             ->join('ventes', 'detail_ventes.vente_id', '=', 'ventes.id')
             ->join('produits', 'detail_ventes.produit_id', '=', 'produits.id')
             ->join('unites', 'produits.unite_vente_id', '=', 'unites.id')
             ->join('categories', 'produits.categorie_id', '=', 'categories.id')
-            ->whereBetween('ventes.created_at', [$dateDebut, $dateFin])
-            ->where('ventes.statut', 'completee')
-            ->select(
+            ->whereBetween(DB::raw('COALESCE(ventes.date_vente, ventes.created_at)'), [$dateDebut, $dateFin])
+            ->whereIn('ventes.statut', ['completee', 'terminee']);
+            
+        // Filtrer par superette si spécifiée
+        if ($superetteId) {
+            $topProduitsQuery->where('ventes.superette_id', $superetteId);
+        }
+        
+        $topProduits = $topProduitsQuery->select(
                 'produits.id',
                 'produits.nom',
                 'categories.nom as categorie_nom',
@@ -82,16 +102,21 @@ class StatistiqueController extends Controller
         ));
     }
 
-    private function getEvolutionVentes($dateDebut, $dateFin, $periode)
+    private function getEvolutionVentes($dateDebut, $dateFin, $periode, $superetteId = null)
     {
         $query = Vente::query()
-            ->whereBetween('created_at', [$dateDebut, $dateFin])
-            ->where('statut', 'completee');
+            ->whereBetween(DB::raw('COALESCE(date_vente, created_at)'), [$dateDebut, $dateFin])
+            ->whereIn('statut', ['completee', 'terminee']);
+            
+        // Filtrer par superette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
 
         switch ($periode) {
             case 'jour':
                 return $query->select(
-                    DB::raw('DATE(created_at) as date'),
+                    DB::raw('DATE(COALESCE(date_vente, created_at)) as date'),
                     DB::raw('SUM(montant_total) as montant')
                 )
                 ->groupBy('date')
@@ -100,8 +125,8 @@ class StatistiqueController extends Controller
 
             case 'semaine':
                 return $query->select(
-                    DB::raw('YEARWEEK(created_at) as date'),
-                    DB::raw('MIN(DATE(created_at)) as date_debut'),
+                    DB::raw('YEARWEEK(COALESCE(date_vente, created_at)) as date'),
+                    DB::raw('MIN(DATE(COALESCE(date_vente, created_at))) as date_debut'),
                     DB::raw('SUM(montant_total) as montant')
                 )
                 ->groupBy('date')
@@ -114,7 +139,7 @@ class StatistiqueController extends Controller
 
             case 'mois':
                 return $query->select(
-                    DB::raw('DATE_FORMAT(created_at, "%Y-%m") as date'),
+                    DB::raw('DATE_FORMAT(COALESCE(date_vente, created_at), "%Y-%m") as date'),
                     DB::raw('SUM(montant_total) as montant')
                 )
                 ->groupBy('date')
@@ -127,7 +152,7 @@ class StatistiqueController extends Controller
 
             case 'annee':
                 return $query->select(
-                    DB::raw('YEAR(created_at) as date'),
+                    DB::raw('YEAR(COALESCE(date_vente, created_at)) as date'),
                     DB::raw('SUM(montant_total) as montant')
                 )
                 ->groupBy('date')

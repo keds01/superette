@@ -16,7 +16,7 @@
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label for="nom" class="form-label">Nom du rôle</label>
-                    <input type="text" class="form-control" id="nom" name="nom" required>
+                    <input type="text" class="form-control" id="name" name="name" required>
                 </div>
                 <div class="col-md-6">
                     <label for="description" class="form-label">Description</label>

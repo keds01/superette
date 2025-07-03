@@ -1,0 +1,323 @@
+@extends('layouts.app')
+
+@section('title', 'Créer une Supérette')
+
+@section('content')
+<div class="py-12">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <!-- Header moderne -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10 animate-fade-in-down">
+            <div>
+                <h1 class="text-4xl font-extrabold bg-gradient-to-tr from-indigo-600 via-blue-500 to-purple-600 bg-clip-text text-transparent tracking-tight drop-shadow-lg">Nouvelle Supérette</h1>
+                <p class="mt-2 text-lg text-gray-500">Créez une nouvelle supérette en renseignant les informations ci-dessous.</p>
+            </div>
+            <a href="{{ route('superettes.index') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold shadow-xl hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-arrow-left"></i>
+                Retour à la liste
+            </a>
+        </div>
+        
+        <!-- Info box contextuelle -->
+        <div class="mb-8 bg-blue-50 border-l-4 border-blue-400 p-6 rounded-xl shadow flex gap-4 items-start animate-fade-in">
+            <div class="flex-1">
+                <h2 class="text-lg font-bold text-blue-700 mb-1">Conseils pour la création d'une supérette</h2>
+                <ul class="list-disc list-inside text-blue-800 text-sm space-y-1">
+                    <li><span class="font-semibold">Champs obligatoires :</span> Les champs marqués d'une <span class="text-red-500">*</span> doivent être remplis (nom, code)</li>
+                    <li><span class="font-semibold">Code unique :</span> Chaque supérette doit avoir un code unique pour l'identification dans le système</li>
+                    <li><span class="font-semibold">Utilisateurs :</span> Associez les utilisateurs qui auront accès à cette supérette</li>
+                    <li><span class="font-semibold">Logo :</span> Ajoutez un logo pour faciliter l'identification visuelle de la supérette</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Formulaire principal -->
+        <div class="relative bg-white/60 backdrop-blur-xl border border-indigo-100 rounded-2xl shadow-2xl p-8 mb-8">
+            @if(session('error'))
+                <div class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if(session('success'))
+                <div class="mb-6 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span>{{ session('success') }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-exclamation-circle mt-0.5"></i>
+                        <div>
+                            <p class="font-semibold mb-2">Veuillez corriger les erreurs ci-dessous&nbsp;:</p>
+                            <ul class="list-disc list-inside space-y-1 text-sm">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            @endif
+            
+            <form action="{{ route('superettes.store') }}" method="POST" enctype="multipart/form-data" class="space-y-8">
+                @csrf
+
+                <!-- Section 1: Informations Générales & Logo -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Colonne Informations Générales -->
+                    <div class="lg:col-span-2 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-6">
+                        <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-store text-indigo-500"></i> Informations Générales
+                        </h3>
+                        
+                        <!-- Note explicative -->
+                        <div class="mb-6 p-4 bg-amber-50/70 rounded-lg border border-amber-100">
+                            <p class="text-amber-800 text-sm">
+                                <i class="fas fa-lightbulb mr-2"></i>
+                                Ces informations sont essentielles pour l'identification de la supérette dans le système. Choisissez un nom clair et un code unique.
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label for="nom" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">
+                                Nom de la supérette <span class="text-red-500">*</span>
+                                <span class="ml-1 bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full">Affiché dans le système</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-store-alt text-indigo-400"></i></div>
+                                <input type="text" id="nom" name="nom" value="{{ old('nom') }}" placeholder="Ex: Superette Centre-Ville" required class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Nom commercial complet de la supérette</p>
+                            @error('nom') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="code" class="block text-sm font-medium text-indigo-700 mb-1 flex items-center gap-1">
+                                Code <span class="text-red-500">*</span>
+                                <span class="ml-1 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">Identifiant unique</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-fingerprint text-indigo-400"></i></div>
+                                <input type="text" id="code" name="code" value="{{ old('code') }}" placeholder="Ex: SUP001" required class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Code unique pour identifier la supérette</p>
+                            @error('code') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="description" class="block text-sm font-medium text-indigo-700 mb-1">Description</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-align-left text-indigo-400"></i></div>
+                                <textarea id="description" name="description" rows="3" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">{{ old('description') }}</textarea>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Informations complémentaires sur la supérette</p>
+                            @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <!-- Colonne Logo -->
+                    <div class="lg:col-span-1 bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-4">
+                        <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-image text-indigo-500"></i> Logo de la Supérette
+                        </h3>
+                        <div class="flex flex-col items-center">
+                            <div id="logoPreviewContainer" class="w-full h-64 mb-4 border-2 border-dashed border-indigo-300 rounded-lg flex items-center justify-center bg-indigo-50/50 overflow-hidden">
+                                <img id="logoPreview" src="{{ asset('images/placeholder-logo.png') }}" alt="Aperçu du logo" class="max-h-full max-w-full object-contain hidden">
+                                <span id="logoPreviewPlaceholder" class="text-indigo-400 text-center p-4">
+                                    <i class="fas fa-cloud-upload-alt fa-3x mb-2"></i><br>
+                                    Cliquez ou glissez-déposez un logo
+                                </span>
+                            </div>
+                            <input type="file" name="logo" id="logo" class="hidden" accept="image/*" onchange="previewLogo(this);">
+                            <label for="logo" class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-tr from-blue-500 to-teal-400 text-white rounded-lg shadow-md hover:shadow-neon hover:-translate-y-1 transition-all">
+                                <i class="fas fa-upload"></i> Choisir un logo
+                            </label>
+                            <p class="mt-2 text-xs text-gray-500">Format accepté : JPEG, PNG, JPG, GIF. Taille max : 2Mo</p>
+                            @error('logo') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Coordonnées -->
+                <div class="bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                        <i class="fas fa-map-marker-alt text-indigo-500"></i> Coordonnées
+                    </h3>
+                    
+                    <!-- Introduction explicative -->
+                    <div class="mb-6 p-4 bg-blue-50/70 rounded-lg border border-blue-100">
+                        <p class="text-blue-800 text-sm">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Ces informations permettent de localiser et contacter la supérette. Elles seront utilisées pour les factures et documents officiels.
+                        </p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="adresse" class="block text-sm font-medium text-indigo-700 mb-1">Adresse</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-map-signs text-indigo-400"></i></div>
+                                <input type="text" id="adresse" name="adresse" value="{{ old('adresse') }}" placeholder="Ex: 123 Avenue Principale" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('adresse') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        
+                        <div>
+                            <label for="telephone" class="block text-sm font-medium text-indigo-700 mb-1">Téléphone</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-phone text-indigo-400"></i></div>
+                                <input type="text" id="telephone" name="telephone" value="{{ old('telephone') }}" placeholder="Ex: +237 612345678" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('telephone') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-indigo-700 mb-1">Email</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-envelope text-indigo-400"></i></div>
+                                <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="Ex: contact@superette.com" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        
+                        <div>
+                            <label for="ville" class="block text-sm font-medium text-indigo-700 mb-1">Ville</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-city text-indigo-400"></i></div>
+                                <input type="text" id="ville" name="ville" value="{{ old('ville') }}" placeholder="Ex: Yaoundé" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('ville') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        
+                        <div>
+                            <label for="code_postal" class="block text-sm font-medium text-indigo-700 mb-1">Code Postal</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-mailbox text-indigo-400"></i></div>
+                                <input type="text" id="code_postal" name="code_postal" value="{{ old('code_postal') }}" placeholder="Ex: BP 1234" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('code_postal') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        
+                        <div>
+                            <label for="pays" class="block text-sm font-medium text-indigo-700 mb-1">Pays</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-globe-africa text-indigo-400"></i></div>
+                                <input type="text" id="pays" name="pays" value="{{ old('pays', 'Cameroun') }}" placeholder="Ex: Cameroun" class="pl-10 block w-full rounded-lg border border-indigo-200 bg-white/80 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 sm:text-sm transition-all">
+                            </div>
+                            @error('pays') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Section 3: Utilisateurs associés -->
+                <div class="bg-white/70 backdrop-blur-md border border-indigo-100 rounded-xl shadow-lg p-6 space-y-6">
+                    <h3 class="text-xl font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                        <i class="fas fa-users text-indigo-500"></i> Utilisateurs associés
+                    </h3>
+                    
+                    <!-- Introduction explicative -->
+                    <div class="mb-6 p-4 bg-indigo-50/70 rounded-lg border border-indigo-100">
+                        <p class="text-indigo-800 text-sm">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Sélectionnez les utilisateurs qui auront accès à cette supérette. Vous pouvez définir leur rôle et désigner un utilisateur par défaut.
+                        </p>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-indigo-200 rounded-lg overflow-hidden">
+                            <thead class="bg-indigo-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Sélectionner</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Nom</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Email</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Rôle dans cette supérette</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Par défaut</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-indigo-100">
+                                @foreach($users as $user)
+                                    <tr class="hover:bg-indigo-50/50 transition-colors">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <input class="form-check-input user-checkbox rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500" type="checkbox" name="users[]" value="{{ $user->id }}" id="user{{ $user->id }}" {{ in_array($user->id, old('users', [])) ? 'checked' : '' }}>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-gray-900">{{ $user->name }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-500">{{ $user->email }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <input type="text" class="form-control form-control-sm rounded-md border-indigo-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-300 text-sm" name="user_roles[{{ $loop->index }}]" placeholder="ex: gérant, caissier, etc.">
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                                            <input class="form-check-input default-radio rounded-full border-indigo-300 text-indigo-600 focus:ring-indigo-500" type="radio" name="default_user" value="{{ $user->id }}" id="default{{ $user->id }}">
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Boutons d'action -->
+                <div class="flex justify-between items-center pt-6">
+                    <a href="{{ route('superettes.index') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-all">
+                        <i class="fas fa-times"></i> Annuler
+                    </a>
+                    <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-tr from-indigo-600 to-purple-500 text-white font-bold rounded-lg shadow-lg hover:shadow-neon hover:-translate-y-1 transition-all duration-200">
+                        <i class="fas fa-save"></i> Créer la Supérette
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script>
+    function previewLogo(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                $('#logoPreview').attr('src', e.target.result).removeClass('hidden');
+                $('#logoPreviewPlaceholder').addClass('hidden');
+            }
+            
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    $(document).ready(function() {
+        // Activer/désactiver le bouton radio quand la case à cocher est cochée/décochée
+        $('.user-checkbox').change(function() {
+            const userId = $(this).val();
+            const isChecked = $(this).prop('checked');
+            
+            $(`#default${userId}`).prop('disabled', !isChecked);
+            
+            if (!isChecked && $(`#default${userId}`).prop('checked')) {
+                $(`#default${userId}`).prop('checked', false);
+            }
+        });
+        
+        // Initialisation
+        $('.user-checkbox').each(function() {
+            const userId = $(this).val();
+            const isChecked = $(this).prop('checked');
+            
+            $(`#default${userId}`).prop('disabled', !isChecked);
+        });
+    });
+</script>
+@endsection 

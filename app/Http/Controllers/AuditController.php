@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\MouvementStock;
 
 class AuditController extends Controller
 {
@@ -36,11 +37,18 @@ class AuditController extends Controller
     public function index()
     {
         try {
-            // Récupération des statistiques générales
-            $totalActivites = ActivityLog::count();
+            // Récupération de la supérette active
+            $superetteId = session('active_superette_id');
+
+            // Récupération des statistiques générales (en tenant compte de la supérette)
+            $totalActivites = \App\Models\ActivityLog::withoutGlobalScopes()
+                ->when($superetteId, fn($q) => $q->where('superette_id', $superetteId))
+                ->count();
             
             // Récupération des dernières activités
-            $dernieresActivites = ActivityLog::with('user')
+            $dernieresActivites = \App\Models\ActivityLog::withoutGlobalScopes()
+                ->when($superetteId, fn($q) => $q->where('superette_id', $superetteId))
+                ->with('user')
                 ->latest()
                 ->take(10)
                 ->get();
@@ -49,7 +57,42 @@ class AuditController extends Controller
             $anomalies = $this->auditService->detecterAnomalies();
             
             // Génération du rapport quotidien
-            $rapportQuotidien = $this->auditService->genererRapportQuotidien();
+            $rapportQuotidien = $this->auditService->genererRapportQuotidien(Carbon::today());
+            
+            // Calcul direct du chiffre d'affaires du jour pour s'assurer qu'il est à jour
+            $query = Vente::whereDate('date_vente', Carbon::today())
+                ->whereIn('statut', ['completee', 'terminee']);
+                
+            // Filtrer par supérette si spécifiée
+            if ($superetteId) {
+                $query->where('superette_id', $superetteId);
+            }
+            
+            $ventesAujourdhui = $query->get();
+            $chiffreAffairesJour = $ventesAujourdhui->sum('montant_total');
+            
+            // Mise à jour du chiffre d'affaires dans le rapport quotidien
+            $rapportQuotidien['ventes']['montant_total'] = $chiffreAffairesJour;
+            
+            // Statistiques supplémentaires pour enrichir l'affichage
+            $statsSupplementaires = [
+                'total_ventes' => Vente::count(),
+                'ventes_aujourd_hui' => Vente::whereDate('created_at', today())->count(),
+                'total_produits' => Produit::count(),
+                'produits_en_rupture' => Produit::where('stock', '<=', 0)->count(),
+                'produits_en_alerte' => Produit::where('stock', '<=', DB::raw('seuil_alerte'))->where('stock', '>', 0)->count(),
+                'total_utilisateurs' => User::count(),
+                'activites_ce_mois' => ActivityLog::whereMonth('created_at', now()->month)->count(),
+                'ventes_annulees' => Vente::where('statut', 'annulee')->count(),
+                'mouvements_stock' => MouvementStock::count(),
+            ];
+            
+            // Si pas d'activités, créer quelques exemples pour démonstration
+            if ($totalActivites === 0) {
+                $this->creerActivitesExemple();
+                $totalActivites = ActivityLog::count();
+                $dernieresActivites = ActivityLog::with('user')->latest()->take(10)->get();
+            }
             
         } catch (\Exception $e) {
             // Log de l'erreur
@@ -70,14 +113,61 @@ class AuditController extends Controller
                 'paiements' => ['total' => 0, 'par_methode' => []],
                 'activites' => ['total' => 0]
             ];
+            $statsSupplementaires = [
+                'total_ventes' => 0,
+                'ventes_aujourd_hui' => 0,
+                'total_produits' => 0,
+                'produits_en_rupture' => 0,
+                'produits_en_alerte' => 0,
+                'total_utilisateurs' => 0,
+                'activites_ce_mois' => 0,
+                'ventes_annulees' => 0,
+                'mouvements_stock' => 0,
+            ];
         }
         
         return view('audit.dashboard', compact(
             'totalActivites',
             'dernieresActivites',
             'anomalies',
-            'rapportQuotidien'
+            'rapportQuotidien',
+            'statsSupplementaires'
         ));
+    }
+    
+    /**
+     * Crée des activités d'exemple pour démonstration
+     */
+    private function creerActivitesExemple()
+    {
+        $user = auth()->user();
+        $types = ['connexion', 'modification', 'creation', 'suppression', 'consultation'];
+        $descriptions = [
+            'connexion' => 'Connexion au système',
+            'modification' => 'Modification d\'un produit',
+            'creation' => 'Création d\'une nouvelle vente',
+            'suppression' => 'Suppression d\'un enregistrement',
+            'consultation' => 'Consultation du rapport'
+        ];
+        
+        for ($i = 0; $i < 15; $i++) {
+            $type = $types[array_rand($types)];
+            $date = now()->subHours(rand(1, 72));
+            
+            ActivityLog::create([
+                'type' => $type,
+                'description' => $descriptions[$type],
+                'user_id' => $user->id,
+                'model_type' => 'App\\Models\\User',
+                'model_id' => $user->id,
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'metadata' => json_encode(['exemple' => true]),
+                'created_at' => $date,
+                'updated_at' => $date,
+                'superette_id' => session('active_superette_id') ?? $user->superette_id
+            ]);
+        }
     }
     
     /**
@@ -85,7 +175,15 @@ class AuditController extends Controller
      */
     public function journal(Request $request)
     {
+        // Récupération de la superette active
+        $superetteId = session('active_superette_id');
+        
         $query = ActivityLog::with('user')->latest();
+        
+        // Filtrer par superette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
         
         // Application des filtres
         if ($request->filled('type')) {
@@ -107,8 +205,21 @@ class AuditController extends Controller
         $activites = $query->paginate(15)->withQueryString();
         
         // Récupération des types d'activités et des utilisateurs pour les filtres
-        $types = ActivityLog::distinct('type')->pluck('type')->toArray();
-        $users = User::orderBy('name')->get();
+        // Filtrer les types d'activités par superette
+        $typesQuery = ActivityLog::distinct('type');
+        if ($superetteId) {
+            $typesQuery->where('superette_id', $superetteId);
+        }
+        $types = $typesQuery->pluck('type')->toArray();
+        
+        // Récupérer les utilisateurs qui ont des activités dans cette superette
+        $usersQuery = User::orderBy('name');
+        if ($superetteId) {
+            $usersQuery->whereHas('activityLogs', function($query) use ($superetteId) {
+                $query->where('superette_id', $superetteId);
+            });
+        }
+        $users = $usersQuery->get();
         
         return view('audit.journal', compact('activites', 'types', 'users'));
     }
@@ -118,7 +229,15 @@ class AuditController extends Controller
      */
     public function exporterJournal(Request $request)
     {
+        // Récupération de la superette active
+        $superetteId = session('active_superette_id');
+        
         $query = ActivityLog::with('user')->latest();
+        
+        // Filtrer par superette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
         
         // Application des filtres
         if ($request->filled('type')) {
@@ -153,22 +272,18 @@ class AuditController extends Controller
      */
     public function anomalies(Request $request)
     {
-        $anomalies = $this->auditService->getAnomalies($request->all());
+        // Récupération de la superette active
+        $superetteId = session('active_superette_id');
         
-        // Paginer les résultats manuellement car c'est une collection et non un modèle
-        $page = $request->get('page', 1);
-        $perPage = 15;
-        $offset = ($page - 1) * $perPage;
+        // Ajout du filtre par superette à la requête
+        $filtres = $request->all();
+        if ($superetteId) {
+            $filtres['superette_id'] = $superetteId;
+        }
         
-        $anomaliesPaginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $anomalies->slice($offset, $perPage),
-            $anomalies->count(),
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
+        $anomalies = $this->auditService->getAnomaliesPaginated($filtres, 15);
         
-        return view('audit.anomalies', ['anomalies' => $anomaliesPaginator]);
+        return view('audit.anomalies', ['anomalies' => $anomalies]);
     }
     
     /**
@@ -176,11 +291,20 @@ class AuditController extends Controller
      */
     public function exporterAnomalies(Request $request)
     {
-        $anomalies = $this->auditService->getAnomalies($request->all());
+        // Récupération de la superette active
+        $superetteId = session('active_superette_id');
+        
+        // Ajout du filtre par superette à la requête
+        $filtres = $request->all();
+        if ($superetteId) {
+            $filtres['superette_id'] = $superetteId;
+        }
+        
+        $anomalies = $this->auditService->getAnomalies($filtres);
         
         $pdf = PDF::loadView('audit.pdf.anomalies', [
             'anomalies' => $anomalies,
-            'filtres' => $request->all(),
+            'filtres' => $filtres,
             'date_generation' => now()
         ]);
         
@@ -196,6 +320,45 @@ class AuditController extends Controller
         
         // Génération du rapport quotidien pour la date spécifiée
         $rapportQuotidien = $this->auditService->genererRapportQuotidien($date);
+        
+        // Calcul direct du chiffre d'affaires du jour (sans les ventes annulées)
+        $superetteId = session('active_superette_id');
+        $query = Vente::whereDate('date_vente', $date)
+            ->whereIn('statut', ['completee', 'terminee']); // Exclure les ventes annulées
+            
+        // Filtrer par supérette si spécifiée
+        if ($superetteId) {
+            $query->where('superette_id', $superetteId);
+        }
+        
+        $ventesValides = $query->get();
+        $chiffreAffairesJour = $ventesValides->sum('montant_total');
+        
+        // Mise à jour du chiffre d'affaires dans le rapport quotidien
+        $rapportQuotidien['ventes']['montant_total'] = $chiffreAffairesJour;
+        $rapportQuotidien['ventes']['panier_moyen'] = $ventesValides->count() > 0 ? $chiffreAffairesJour / $ventesValides->count() : 0;
+        
+        // Récupération des paiements avec méthodes correctes
+        $queryPaiements = Paiement::whereDate('date_paiement', $date);
+        if ($superetteId) {
+            $queryPaiements->where('superette_id', $superetteId);
+        }
+        
+        $paiements = $queryPaiements->get();
+        $montantsParMethode = $paiements->groupBy('methode')
+            ->map(function ($items) {
+                return [
+                    'count' => $items->count(),
+                    'total' => $items->sum('montant')
+                ];
+            })->toArray();
+        
+        // Mise à jour des informations de paiement dans le rapport
+        $rapportQuotidien['paiements']['total'] = $paiements->count();
+        $rapportQuotidien['paiements']['montant_total'] = $paiements->sum('montant');
+        $rapportQuotidien['paiements']['par_methode'] = $montantsParMethode;
+        $rapportQuotidien['paiements']['total_transactions'] = $paiements->count();
+        $rapportQuotidien['paiements']['total_montant'] = $paiements->sum('montant');
         
         // Vérifier si l'export PDF est demandé
         if ($request->format === 'pdf') {
@@ -216,11 +379,20 @@ class AuditController extends Controller
      */
     public function detailAnomalie($id)
     {
+        // Récupération de la superette active
+        $superetteId = session('active_superette_id');
+        
         $anomalie = $this->auditService->getAnomalieById($id);
         
         if (!$anomalie) {
             return redirect()->route('audit.anomalies')
                 ->with('error', 'Anomalie non trouvée');
+        }
+        
+        // Vérifier que l'anomalie appartient à la superette active
+        if ($superetteId && isset($anomalie['superette_id']) && $anomalie['superette_id'] != $superetteId) {
+            return redirect()->route('audit.anomalies')
+                ->with('error', 'Vous n\'avez pas accès à cette anomalie');
         }
         
         // Récupération des données associées selon le type d'anomalie
@@ -231,27 +403,42 @@ class AuditController extends Controller
         
         if (isset($anomalie['details']['produit_id'])) {
             $produit = Product::find($anomalie['details']['produit_id']);
-            $activitesLiees = ActivityLog::where('model_type', 'Product')
+            $activitesQuery = ActivityLog::where('model_type', 'Product')
                 ->where('model_id', $anomalie['details']['produit_id'])
-                ->latest()
-                ->take(5)
-                ->get();
+                ->latest();
+                
+            // Filtrer par superette si spécifiée
+            if ($superetteId) {
+                $activitesQuery->where('superette_id', $superetteId);
+            }
+            
+            $activitesLiees = $activitesQuery->take(5)->get();
         }
         
         if (isset($anomalie['details']['user_id'])) {
             $utilisateur = User::find($anomalie['details']['user_id']);
-            $activitesLiees = ActivityLog::where('user_id', $anomalie['details']['user_id'])
-                ->latest()
-                ->take(5)
-                ->get();
+            $activitesQuery = ActivityLog::where('user_id', $anomalie['details']['user_id'])
+                ->latest();
+                
+            // Filtrer par superette si spécifiée
+            if ($superetteId) {
+                $activitesQuery->where('superette_id', $superetteId);
+            }
+            
+            $activitesLiees = $activitesQuery->take(5)->get();
         }
         
         if (isset($anomalie['details']['vente_id'])) {
-            $activitesLiees = ActivityLog::where('model_type', 'Vente')
+            $activitesQuery = ActivityLog::where('model_type', 'Vente')
                 ->where('model_id', $anomalie['details']['vente_id'])
-                ->latest()
-                ->take(5)
-                ->get();
+                ->latest();
+                
+            // Filtrer par superette si spécifiée
+            if ($superetteId) {
+                $activitesQuery->where('superette_id', $superetteId);
+            }
+            
+            $activitesLiees = $activitesQuery->take(5)->get();
         }
         
         // Récupération des commentaires associés à l'anomalie

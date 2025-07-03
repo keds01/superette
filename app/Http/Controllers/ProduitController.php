@@ -42,35 +42,17 @@ class ProduitController extends Controller
      */
     public function create()
     {
-        try {
-            \Log::info('Accès à la page de création de produit');
-            
-            $categories = Categorie::orderBy('nom')->get();
-            \Log::info('Catégories chargées', ['count' => $categories->count()]);
-            
-            $unites = Unite::orderBy('nom')->get();
-            \Log::info('Unités chargées', ['count' => $unites->count()]);
-            
-            $unites_vente = Unite::orderBy('nom')->get();
-            \Log::info('Unités de vente chargées', ['count' => $unites_vente->count()]);
-            
-            $fournisseurs = Fournisseur::orderBy('nom')->get();
-            \Log::info('Fournisseurs chargés', ['count' => $fournisseurs->count()]);
-            
-            $marques = Marque::orderBy('nom')->get();
-            \Log::info('Marques chargées', ['count' => $marques->count()]);
-            
-            return view('produits.create', compact('categories', 'unites', 'unites_vente', 'fournisseurs', 'marques'));
-        } catch (\Exception $e) {
-            \Log::error('Erreur lors du chargement de la page de création de produit', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return back()->with('error', 'Une erreur est survenue lors du chargement de la page : ' . $e->getMessage());
+        // Vérifier qu'une superette active est sélectionnée
+        $activeSuperetteId = session('active_superette_id');
+        if (!$activeSuperetteId) {
+            return redirect()->route('superettes.select')
+                ->with('error', 'Veuillez sélectionner une superette avant de créer un produit.');
         }
+        
+        $categories = \App\Models\Categorie::orderBy('nom')->get();
+        $unites_vente = \App\Models\Unite::orderBy('nom')->get();
+        
+        return view('produits.create', compact('categories', 'unites_vente'));
     }
 
     public function index(Request $request)
@@ -141,16 +123,31 @@ class ProduitController extends Controller
     {
         Log::info('Payload produit POST pour création', $request->all());
 
+        // Vérifier qu'une superette active est sélectionnée
+        $activeSuperetteId = session('active_superette_id');
+        if (!$activeSuperetteId) {
+            return redirect()->route('superettes.select')
+                ->with('error', 'Veuillez sélectionner une superette avant de créer un produit.');
+        }
+
         try {
             // Obtenir les données validées et préparées depuis la requête
             $produitData = $request->produitData();
+            
+            // Ajouter explicitement la superette active
+            $produitData['superette_id'] = $activeSuperetteId;
             
             // Utiliser le service pour créer le produit
             $produit = $this->produitService->createProduct(
                 array_merge($produitData, ["image" => $request->file('image')])
             );
             
-            Log::info('Produit créé avec succès', ["id" => $produit->id, "nom" => $produit->nom]);
+            Log::info('Produit créé avec succès', [
+                "id" => $produit->id, 
+                "nom" => $produit->nom,
+                "superette_id" => $produit->superette_id
+            ]);
+            
             return redirect()->route('produits.index')
                 ->with('success', 'Produit "' . $produit->nom . '" créé avec succès !');
                 
@@ -171,18 +168,21 @@ class ProduitController extends Controller
         \Log::info('Accès à la page d\'édition du produit', ['id' => $produit->id, 'nom' => $produit->nom]);
         try {
             // Chargement des relations nécessaires pour l'édition
-            $produit->load(['categorie', 'uniteVente', 'fournisseur', 'marque']);
+            // Utilisation de with() au lieu de load() pour éviter les erreurs si relations nulles
+            $produit->load('conditionnements');
+            
             \Log::debug('Relations chargées pour édition', [
                 'categorie' => $produit->categorie ? $produit->categorie->nom : null,
                 'unite' => $produit->uniteVente ? $produit->uniteVente->nom : null,
-                'fournisseur' => $produit->fournisseur ? $produit->fournisseur->nom : null,
-                'marque' => $produit->marque ? $produit->marque->nom : null,
+                'conditionnements' => $produit->conditionnements->count()
             ]);
+            
             $categories = Categorie::orderBy('nom')->get();
-            $unites = Unite::orderBy('nom')->get();
+            $unites_vente = Unite::orderBy('nom')->get();
             $fournisseurs = Fournisseur::orderBy('nom')->get();
             $marques = Marque::orderBy('nom')->get();
-            return view('produits.edit', compact('produit', 'categories', 'unites', 'fournisseurs', 'marques'));
+            
+            return view('produits.edit', compact('produit', 'categories', 'unites_vente', 'fournisseurs', 'marques'));
         } catch (\Exception $e) {
             \Log::error('Erreur lors de l\'accès à la page d\'édition du produit', [
                 'error' => $e->getMessage(),
@@ -203,8 +203,21 @@ class ProduitController extends Controller
     public function update(ProduitRequest $request, Produit $produit)
     {
         try {
+            // Log des données reçues
+            \Log::debug('Données reçues pour la mise à jour du produit', [
+                'produit_id' => $produit->id,
+                'all_data' => $request->all(),
+                'conditionnements' => $request->input('conditionnements')
+            ]);
+            
             // Obtenir les données validées et préparées depuis la requête
-            $produitData = $request->produitData($produit->id);
+            $produitData = $request->produitData();
+            
+            // Log des données validées
+            \Log::debug('Données validées pour la mise à jour du produit', [
+                'produit_id' => $produit->id,
+                'produitData' => $produitData
+            ]);
             
             // Utiliser le service pour mettre à jour le produit
             $produit = $this->produitService->updateProduct(
@@ -213,7 +226,7 @@ class ProduitController extends Controller
             );
             
             Log::info('Produit mis à jour avec succès', ["id" => $produit->id, "nom" => $produit->nom]);
-            return redirect()->route('produits.index')
+            return redirect()->route('produits.show', $produit)
                 ->with('success', 'Produit "' . $produit->nom . '" mis à jour avec succès !');
                 
         } catch (\Exception $e) {
@@ -308,6 +321,21 @@ class ProduitController extends Controller
 
     public function show(Produit $produit)
     {
+        \Log::info('Accès à la page de détail du produit', [
+            'id' => $produit->id,
+            'nom' => $produit->nom
+        ]);
+        
+        // Forcer le rechargement des conditionnements depuis la base de données
+        $conditionnements = \DB::table('conditionnements')
+            ->where('produit_id', $produit->id)
+            ->get();
+            
+        \Log::debug('Conditionnements récupérés directement de la DB', [
+            'count' => $conditionnements->count(),
+            'conditionnements' => $conditionnements->toArray()
+        ]);
+        
         $produit->load([
             'categorie',
             'uniteVente',
@@ -320,6 +348,16 @@ class ProduitController extends Controller
                       ->where('actif', true)
                       ->orderBy('date_fin', 'desc');
             }
+        ]);
+        
+        // Recharger explicitement les conditionnements
+        $produit->load('conditionnements');
+
+        // Debug des conditionnements
+        \Log::debug('Conditionnements du produit après rechargement', [
+            'produit_id' => $produit->id,
+            'conditionnements_count' => $produit->conditionnements->count(),
+            'conditionnements' => $produit->conditionnements->toArray()
         ]);
 
         // Utilisation du ProduitService pour obtenir les statistiques

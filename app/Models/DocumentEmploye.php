@@ -121,6 +121,6 @@ class DocumentEmploye extends Model
         }
 
         // Vérifier si l'utilisateur a les permissions nécessaires
-        return $user->hasRole(['admin', 'rh', 'manager']);
+        return $user->hasRole(['admin', 'super_admin', 'rh', 'manager']);
     }
 } 

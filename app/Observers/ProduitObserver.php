@@ -25,6 +25,24 @@ class ProduitObserver
                 ->first();
             
             if (!$alerteExistante) {
+                // Récupérer la superette_id du produit
+                $superetteId = $produit->superette_id;
+                
+                // Si le produit n'a pas de superette_id, utiliser celle de la session
+                if (!$superetteId) {
+                    $superetteId = session('active_superette_id');
+                }
+                
+                // Si toujours pas de superette_id, utiliser celle de l'utilisateur connecté
+                if (!$superetteId && auth()->check() && auth()->user()->superette_id) {
+                    $superetteId = auth()->user()->superette_id;
+                }
+                
+                // Si toujours pas de superette_id, utiliser la superette par défaut (ID 1)
+                if (!$superetteId) {
+                    $superetteId = 1; // Superette par défaut
+                }
+                
                 // Crée une nouvelle alerte
                 Alerte::create([
                     'produit_id' => $produit->id,
@@ -32,7 +50,8 @@ class ProduitObserver
                     'seuil' => $produit->seuil_alerte,
                     'message' => "Le stock de {$produit->nom} est inférieur au seuil minimum ({$produit->seuil_alerte})",
                     'estDeclenchee' => true,
-                    'actif' => true
+                    'actif' => true,
+                    'superette_id' => $superetteId
                 ]);
                 
                 Log::info("Alerte créée pour le produit {$produit->nom}");

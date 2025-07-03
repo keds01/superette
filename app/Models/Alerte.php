@@ -2,27 +2,29 @@
 
 namespace App\Models;
 
+use App\Traits\HasSuperette;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Alerte extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSuperette;
     
     protected $table = 'alertes';
 
     protected $fillable = [
         'produit_id',
-        'categorie_id',
         'type',
         'seuil',
         'periode',
         'message',
         'estDeclenchee',
         'actif',
+        'notification_email',
+        'date_peremption',
         'date_resolution',
-        'date_peremption'
+        'superette_id'
     ];
 
     protected $casts = [
@@ -71,6 +73,9 @@ class Alerte extends Model
      */
     public function estDeclenchee(): bool
     {
+        if (!$this->produit) {
+            return false;
+        }
         if ($this->type === 'seuil_minimum') {
             return $this->produit->stock_actuel <= $this->seuil;
         } elseif ($this->type === 'seuil_maximum') {

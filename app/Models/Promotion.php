@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasSuperette;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Promotion extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSuperette;
 
     protected $fillable = [
         'produit_id',
@@ -15,8 +16,9 @@ class Promotion extends Model
         'valeur',
         'date_debut',
         'date_fin',
+        'description',
         'actif',
-        'description'
+        'superette_id'
     ];
 
     protected $casts = [
@@ -53,7 +55,7 @@ class Promotion extends Model
                $this->date_fin >= now();
     }
 
-    public function calculerPrixReduit($prixOriginal)
+    public function calculerPrixPromo($prixOriginal)
     {
         if (!$this->estValide()) {
             return $prixOriginal;

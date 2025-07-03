@@ -9,12 +9,21 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     
-    <!-- Scripts -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @livewireStyles
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Styles -->
+    @livewireStyles
+    @stack('styles')
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/images/LOGO_ELIFRANC_PRIX.png">
 </head>
 <body class="relative h-full font-sans antialiased bg-gradient-to-tr from-white via-indigo-50 to-purple-100 overflow-x-hidden">
     <!-- Fond glassmorphism global -->
@@ -26,9 +35,9 @@
                 <div class="flex h-16 justify-between">
                     <div class="flex">
                         <!-- Logo -->
-                        <div class="flex flex-shrink-0 items-center">
-                            <a href="{{ route('dashboard') }}" class="text-2xl font-bold text-indigo-600">
-                                {{ config('app.name', 'Gestion Supérette') }}
+                        <div class="flex-shrink-0 items-center">
+                            <a href="{{ route('dashboard') }}">
+                                <img src="/images/LOGO_ELIFRANC_PRIX.png" alt="Logo Elifranc" class="h-16 w-auto">
                             </a>
                         </div>
 
@@ -73,11 +82,14 @@
                     <div class="hidden sm:ml-6 sm:flex sm:items-center">
                         <div class="relative ml-3" x-data="{ open: false }">
                             <div>
+                                @php
+                                    $user = Auth::user();
+                                    $profile = $user->profile;
+                                    $photoUrl = $profile && $profile->photo ? $profile->photo_url : 'https://ui-avatars.com/api/?name=' . urlencode($user->name) . '&color=7F9CF5&background=EBF4FF';
+                                @endphp
                                 <button type="button" @click="open = !open" class="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" id="user-menu-button">
                                     <span class="sr-only">Ouvrir le menu utilisateur</span>
-                                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-500">
-                                        <span class="text-sm font-medium leading-none text-white">{{ substr(Auth::user()->name ?? 'U', 0, 1) }}</span>
-                                    </span>
+                                    <img class="h-8 w-8 rounded-full object-cover" src="{{ $photoUrl }}" alt="{{ $user->name }}">
                                 </button>
                             </div>
                             <div x-show="open" @click.away="open = false" class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabindex="-1">
@@ -140,9 +152,7 @@
                     <div class="border-t border-gray-200 pt-4 pb-3">
                         <div class="flex items-center px-4">
                             <div class="flex-shrink-0">
-                                <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-500">
-                                    <span class="text-sm font-medium leading-none text-white">{{ substr(Auth::user()->name ?? 'U', 0, 1) }}</span>
-                                </span>
+                                <img class="h-10 w-10 rounded-full object-cover" src="{{ $photoUrl }}" alt="{{ $user->name }}">
                             </div>
                             <div class="ml-3">
                                 <div class="text-base font-medium text-gray-800">{{ Auth::user()->name ?? 'Utilisateur' }}</div>

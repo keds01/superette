@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use App\Scopes\SuperetteScope;
 
 class Produit extends Model
 {
@@ -20,28 +21,43 @@ class Produit extends Model
 
     protected $table = 'produits';
 
+    /**
+     * The "booted" method of the model.
+     *
+     * @return void
+     */
+    protected static function booted()
+    {
+        static::addGlobalScope(new SuperetteScope);
+    }
+
     protected $fillable = [
         'nom',
         'reference',
         'code_barres',
         'description',
         'categorie_id',
+        'fournisseur_id',
+        'marque_id',
+        'unite_mesure_id',
         'unite_vente_id',
-        'conditionnement_fournisseur',
-        'quantite_par_conditionnement',
+        'conditionnement',
         'stock',
         'seuil_alerte',
         'emplacement_rayon',
         'emplacement_etagere',
+        'image',
         'date_peremption',
         'delai_alerte_peremption',
+        'conditionnement_fournisseur',
+        'quantite_par_conditionnement',
         'prix_achat_ht',
         'prix_vente_ht',
         'prix_vente_ttc',
         'marge',
         'tva',
-        'image',
-        'actif'
+        'actif',
+        'superette_id'
     ];
 
     protected $casts = [
@@ -57,6 +73,9 @@ class Produit extends Model
         'delai_alerte_peremption' => 'integer',
         'actif' => 'boolean'
     ];
+
+    // Always include virtual attributes in JSON serialization
+    protected $appends = ['code_barre'];
 
     // Relations
     /**
@@ -76,6 +95,11 @@ class Produit extends Model
     public function uniteVente()
     {
         return $this->belongsTo(Unite::class, 'unite_vente_id');
+    }
+
+    public function superette()
+    {
+        return $this->belongsTo(Superette::class, 'superette_id');
     }
 
     public function mouvementsStock()
@@ -101,6 +125,11 @@ class Produit extends Model
     public function promotions(): HasMany
     {
         return $this->hasMany(Promotion::class, 'produit_id');
+    }
+
+    public function conditionnements()
+    {
+        return $this->hasMany(Conditionnement::class);
     }
 
     // Scopes
@@ -129,21 +158,11 @@ class Produit extends Model
     }
 
     // Accesseurs
-    // public function getStockActuelAttribute()
-    // {
-    //     // Le champ gerer_stock n'existe pas dans la migration.
-    //     // La colonne 'stock' est la source de vérité.
-    //     // if (!$this->gerer_stock) {
-    //     //     return null;
-    //     // }
-
-    //     // return $this->mouvementsStock() // Supposant que stocks() était une typo pour mouvementsStock()
-    //     //     ->where('type_mouvement', 'entree')
-    //     //     ->sum('quantite') - 
-    //     //     $this->mouvementsStock()
-    //     //     ->where('type_mouvement', 'sortie')
-    //     //     ->sum('quantite');
-    // }
+    public function getStockActuelAttribute()
+    {
+        // Si un jour on gère les mouvements, remplacer par un calcul dynamique
+        return $this->stock;
+    }
 
     public function getMargePourcentageAttribute()
     {
@@ -175,6 +194,12 @@ class Produit extends Model
 
     public function getPrixVenteTTCAttribute(): float
     {
+        // Si le prix est déjà défini dans la base de données, l'utiliser
+        if (isset($this->attributes['prix_vente_ttc']) && $this->attributes['prix_vente_ttc'] > 0) {
+            return (float)$this->attributes['prix_vente_ttc'];
+        }
+        
+        // Sinon calculer à partir du prix HT
         return $this->prix_vente_ht * (1 + $this->tva / 100);
     }
 
@@ -221,6 +246,17 @@ class Produit extends Model
         return $this->stock * $this->quantite_par_conditionnement;
     }
 
+    /**
+     * Alias pour accéder au champ code_barres sous le nom code_barre (singulier)
+     * Cela permet d'utiliser $produit->code_barre côté front sans modifier la colonne de base de données.
+     *
+     * @return string|null
+     */
+    public function getCodeBarreAttribute()
+    {
+        return $this->code_barres;
+    }
+
     // Méthodes utilitaires
     public function calculerPrixVenteHT()
     {
@@ -251,5 +287,47 @@ class Produit extends Model
         // Utiliser le délai personnalisé (s'il existe) ou la valeur par défaut (30 jours)
         $delai = $this->delai_alerte_peremption ?? 30;
         return now()->diffInDays($this->date_peremption, false) <= $delai && now()->diffInDays($this->date_peremption, false) > 0;
+    }
+
+    /**
+     * Calcule la répartition optimale des conditionnements et le prix total pour une quantité donnée
+     * @param int $quantite
+     * @return array [ 'detail' => [ [type, quantite, prix_unitaire, total] ], 'total' => float ]
+     */
+    public function calculTarifOptimal($quantite)
+    {
+        $conditionnements = $this->conditionnements()->orderByDesc('quantite')->get();
+        $reste = $quantite;
+        $detail = [];
+        $total = 0;
+        foreach ($conditionnements as $cond) {
+            if ($reste >= $cond->quantite) {
+                $nb = intdiv($reste, $cond->quantite);
+                $total += $nb * $cond->prix;
+                $detail[] = [
+                    'type' => $cond->type,
+                    'quantite' => $nb * $cond->quantite,
+                    'conditionnement' => $cond->quantite,
+                    'nb_conditionnements' => $nb,
+                    'prix_unitaire' => $cond->prix,
+                    'total' => $nb * $cond->prix
+                ];
+                $reste = $reste % $cond->quantite;
+            }
+        }
+        // Si reste, chercher le plus petit conditionnement dispo
+        if ($reste > 0 && $conditionnements->count()) {
+            $cond = $conditionnements->where('quantite', 1)->first() ?? $conditionnements->last();
+            $total += $reste * ($cond->prix / $cond->quantite);
+            $detail[] = [
+                'type' => $cond->type,
+                'quantite' => $reste,
+                'conditionnement' => $cond->quantite,
+                'nb_conditionnements' => 0,
+                'prix_unitaire' => $cond->prix,
+                'total' => $reste * ($cond->prix / $cond->quantite)
+            ];
+        }
+        return [ 'detail' => $detail, 'total' => $total ];
     }
 }

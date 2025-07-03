@@ -8,11 +8,15 @@
                         Rapport détaillé de l'état actuel des stocks, incluant les alertes et les dates de péremption.
                     </p>
                 </div>
-                <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-                    <a href="{{ route('reports.export', ['type' => 'stock']) }}" class="btn-secondary">
-                        Exporter en CSV
-                    </a>
-                </div>
+                <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex gap-2">
+    <a href="{{ route('reports.export', ['type' => 'stock']) }}" class="btn-secondary">
+        Exporter en CSV
+    </a>
+    <a href="/mouvements-stock" class="btn-primary flex items-center gap-2">
+        <i class="fas fa-exchange-alt"></i>
+        Voir mouvements de stock
+    </a>
+</div>
             </div>
 
             <!-- Résumé -->
